@@ -4,6 +4,11 @@
 
 ---
 
+## 🏛 Affiliation
+These interactive demonstrations were developed at **[GREYC](https://www.greyc.fr/)** (UMR CNRS 6072), a joint research unit of **CNRS**, **ENSICAEN**, and **Université de Caen Normandie**. The project reflects the laboratory's commitment to open science, creative computing, and public engagement in research.
+
+---
+
 ## 🎯 Purpose
 This repository hosts **interactive demonstrations** designed for public events like the **Fête de la Science** or **Féno**.
 
