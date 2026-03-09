@@ -1,0 +1,448 @@
+#!/usr/bin/env gmic
+#
+#  File        : greyc_warp.gmic
+#                ( G'MIC command file )
+#
+#  Description : Interactive demo for warping images from the webcam
+#                ( https://gmic.eu )
+#
+#  Copyright   : David Tschumperle
+#                ( https://tschumperle.users.greyc.fr/ )
+#
+
+# Usage :
+#--------
+# $1: Webcam number to use (default 0).
+# $2,$3: Webcam resolution (default 0=automatic).
+# $4: locale ('fr' ou 'en').
+
+rm gw $*
+
+gw : skip "${1=0},${2=0},${3=0},${4=fr}"
+
+  # Initialize display and variables.
+  m "tr : gw_tr_$4 $\"*\""
+  w[] ${"fitscreen[] "{*,u,v}},0,0,0,0,${"tr \"GREYC - Interactive Warp\""}
+  selected_keypoint=-1
+  show_keypoints=1
+  boundary=3
+  normalize_image=1
+  is_fullscreen=0
+  is_snapshot=0
+  is_mirror=1
+  is_joke=1
+  snapshot_action=
+  display_help=0
+  display_warp=0
+  t_joke=0 s_joke=
+  if !isdir('snapshots') x "mkdir snapshots" fi
+  (0,0;1,1;6,1;7,0;20,-1) permute. yzcx rbf. 512,0,20 c. 0,1 => joke_opac
+  palette hsv r. 360,1,1,3,3 => hsv
+
+  # Determine webcam resolution.
+  if min($2,$3)>0
+    camera_resolution=,$2,$3
+  else
+    test_resolutions=1280,720,\
+                     1280,800,\
+                     960,720,\
+                     800,600,\
+                     640,480
+
+    repeat narg($test_resolutions)/2 {
+      res:=[$test_resolutions][2*$>,2]
+      {*,w,h} to. ${"tr \"Initialize webcam: try resolution\""}" "{arg1(1,$res)}x{arg1(2,$res)}"...",0.01~,0.01~,24 w. rm.
+      l[] { camera $1,1,0,$res rm onfail res= }
+      if narg($res) break fi
+    }
+    if narg($res) camera_resolution=,$res fi
+  fi
+
+  # Enter event loop.
+  t_start=$|
+  do
+
+    # Generate help box.
+    if !narg($help)
+      0 t. "Help:"\n\n\
+       " - F1 \234 F10: Select keypoint preset."\n\
+       " - Left click: Add/move keypoint."\n\
+       " - Right click: Delete keypoint."\n\
+       " - TAB: Show/hide keypoints."\n\
+       " - RETURN or R: Reset keypoints."\n\
+       " - SPACE or S: Toggle snapshot mode."\n\
+       " - B: Toggle boundary conditions."\n\
+       " - F: Toggle fullscreen."\n\
+       " - G: Open snapshot in GIMP."\n\
+       " - J: Toggle joke mode."\n\
+       " - M: Mirror mode."\n\
+       " - N: Toggle image normalization."\n\
+       " - P: Print snapshot."\n\
+       " - U: Upload snapshot to server."\n\
+       " - W: Display warp field."\n\
+       " - H: Display help."\n\
+       " - ESC or Q: Exit."\
+       ,0,0,{{*,h}/24},1,1
+      frame. 8,8,0 frame. 2,2,1 n. 0,255 to_rgb. => help
+    fi
+
+    # Generate background.
+    if !narg($background)" || "[w#$background,h#$background]!=[{*,w,h}]
+      rmn warp,background,snapshot_view,joke_gfx,joke_mask
+      selected_keypoint=-1
+      camera $1,1,0$camera_resolution
+      if $is_mirror mirror. x fi
+      rs. {round([{*,w,h}]*0.82)},1 W,H:=w,h rm.
+      W1,H1:=[$W,$H]-1
+      X0,Y0:=round(([{*,w,h}]-[$W,$H])/[2,1.25])
+      X1,Y1:=[$X0+$W1,$Y0+$H1]
+
+      images/blue_background.jpg
+      rs. {*,w,h},3,2 r. {*,w,h},1,3,0,0,0.5,0.5
+      rgb2hsv. f. "[ i0 - 40*y/h,i1*min(1,0.2+y/h),i2*min(0.5,3*y/h) ]" hsv2rgb.
+      gw_insert_logos. 0,7.7
+
+      rectangle. {[$X0-5,$Y0-5,$X1+5,$Y1+5]},1,255
+      => background
+    fi
+
+    # Generate joke graphics.
+    if $is_joke" && "!narg($joke_gfx)" && "$|>$t_start+10
+      s_joke=${-gw_joke}
+      t_joke=$|
+      0 t. $s_joke,0,0,{background,h/28},1,1
+      +dilate. 5 *.. 255 to_rgb..
+      => joke_gfx,joke_mask
+    fi
+
+    # Generate keypoints.
+    if !narg($keypoints)
+      1,4,1,4,"X = y%2; Y = int(y/2); [X,Y,X,Y]" N0:=h => keypoints
+    fi
+    if {keypoints,h<=4} show_keypoints=1 fi
+
+    # Generate displacement map.
+    if !narg($warp)
+      +f[keypoints] "[i0,i1,i0 - i2,i1 - i3]" rbf. {[$W,$H]/4},0,0,1,1 r. $W,$H,1,2,5 f. "[i0*(w - 1),i1*(h - 1)]"
+      => warp
+    fi
+
+    # Render canvas.
+    if $is_snapshot
+      if !narg($snapshot) # Generate/save/[print] snapshot in high resolution
+        camera $1,1,0$camera_resolution
+        if $is_mirror mirror. x fi
+        +f[keypoints] "[i0,i1,i0 - i2,i1 - i3]" rbf. {-2,[w,h]/4},0,0,1,1
+        r. {-2,[w,h]},1,2,5 f. "[i0*(w - 1),i1*(h - 1)]"
+        warp.. .,1,1,$boundary rm.
+        if $normalize_image gw_normalize_image. fi
+        => snapshot
+
+        +rs. 1280,6 c. 0,255 gw_insert_logos. 1,10
+        snapshot_filename=${"filename_dated snapshots/snapshot.jpg"}
+        o. $snapshot_filename,75
+        rm.
+      fi
+      if narg($snapshot_action)
+        if '$snapshot_action'=='gimp'
+          if $is_fullscreen w[] ${"fitscreen[] "{*,u,v}},0,0 fi
+          is_fullscreen:=0
+          rmn help
+          x "gimp "$snapshot_filename
+        elif '$snapshot_action'=='print'
+          x "lp "$snapshot_filename
+        elif '$snapshot_action'=='upload'
+          x "curl -F fupload=@"$snapshot_filename" https://calico.ruedubagou.fr/gmicfup.php --output qrcode.png"
+          rmn snapshot_view
+          l[] {
+            qrcode.png delete "qrcode.png"
+            frame 10,10,0
+            0 t. ${"tr \"  Scan this QR-Code\nto download snapshot\""},0.5~,0,24,1,255 autocrop.
+            frame. 10,10,0 rs. {0,w} to_rgb.
+            a y
+          onfail
+            rm gui_print_preview "Error",32,"Cannot retrieve the QR Code from the server."
+          }
+          to_rgb. +rs[snapshot] $W,$H,6 c. 0,255 rs.. {round(w/4)},1 j. ..,10,10 rm..
+          => snapshot_view
+         fi
+        snapshot_action=
+      fi
+      if !narg($snapshot_view)
+        +rs[snapshot] $W,$H,6 c. 0,255
+        to. ${"tr \"Snapshot\""},0.01~,0.01~,{background,h/32},2,0.75,255,200,0
+        => snapshot_view
+      fi
+      +j[background] [snapshot_view],$X0,$Y0 # Display snapshot
+
+    else
+      camera $1,1,0$camera_resolution
+      if $is_mirror mirror. x fi
+      r. $W,$H,1,3,2 warp. [warp],1,1,$boundary
+      if $normalize_image gw_normalize_image. fi
+      if $display_warp
+        100%,100%,1,1 quiver. [warp],4%,1,1,1,1 dilate. 3
+        100%,100%,1,1,"rad2deg(atan2(i(#$warp,x,y,0,1),i(#$warp,x,y,0,0)))%360" map. [hsv]
+        j... .,0,0,0,0,0.65,.. rm[-2,-1]
+      fi
+      +j[background] .,$X0,$Y0 rm.. # Display current camera frame
+      if $show_keypoints
+        eval[keypoints] "y>=$N0?(
+          cx = lerp($X0,$X1,i0);
+          cy = lerp($Y0,$Y1,i1);
+          ellipse(#-1,cx,cy,4,4,0,1,255,255,0);
+          ellipse(#-1,cx,cy,-4,-4,0,1,0xFFFFFFFF,0,0,0);
+        )"
+      fi
+    fi
+
+    # Display joke.
+    if narg($joke_gfx)
+      dt:=($|-$t_joke)/25
+      if $dt>0
+        j. [joke_gfx],0.5~,0.05~,0,0,{joke_opac,i[round($dt*w)]},[joke_mask]
+        if $dt>=1 rmn joke_gfx,joke_mask fi
+      fi
+    fi
+
+    # Display help.
+    if $display_help j. [help],0.5~,0.5~,0,0,0.75 fi
+
+    w. rm.
+
+    # Manage user events.
+    mb,mx,my={*,b,x,y}
+    x,y:="[$mx - $X0,$my - $Y0]/[$X1 - $X0,$Y1 - $Y0]"
+    is_inside:=min(inrange([$x,$y],0,1))
+
+    if !$mb # Mouse button not pressed
+      selected_keypoint=-1
+
+    elif $is_snapshot # Mouse button pressed in snapshot mode
+      if $is_inside
+        is_snapshot=0 snapshot_action=
+        rmn snapshot,snapshot_view
+        skip {*,-b}
+      fi
+
+    else # Mouse button pressed in normal mode
+      if $selected_keypoint<0" && "$is_inside
+        # Determine if existing keypoint has been selected.
+        +f[keypoints] "norm(($x - i0)*$W1,($y - i1)*$H1)" selected_keypoint:=im<10?ym:-1 rm.
+      fi
+
+      if $mb==1 # Left mouse button
+        if $selected_keypoint<0" && "$is_inside
+          # Create new keypoint.
+          1,1,1,4 f. "[$x,$y,[$x,$y] - I(#$warp,[$x*$W1,$y*$H1])/[$W1,$H1]]" a[keypoints,-1] y
+          selected_keypoint={keypoints,h-1}
+          rmn warp
+        elif $selected_keypoint>=4" && "$is_inside
+          # Move keypoint.
+          =[keypoints] $x,0,$selected_keypoint,0,0
+          =[keypoints] $y,0,$selected_keypoint,0,1
+          rmn warp
+        fi
+      elif $mb==2 # Right mouse button
+        if $selected_keypoint>=4" && "$is_inside
+          # Delete keypoint.
+          l[keypoints] { s y rm[$selected_keypoint] a y }
+          selected_keypoint=-1
+          rmn warp
+          wait[0] -1
+        fi
+      fi
+    fi
+
+    if !$is_snapshot
+      if {*,-W} display_warp:=!$display_warp fi # Display warp field
+      if {*,-N} normalize_image:=!$normalize_image fi # Normalize mode
+      if {*,-TAB} show_keypoints:=!$show_keypoints fi # Show/hide keypoints
+      if {*,-B} boundary:=($boundary+1)%4 fi # Change boundary conditions
+    fi
+
+    if {*,-J} is_joke:=!$is_joke rmn joke_gfx,joke_mask fi # Joke mode
+    if {*,-H} display_help:=!$display_help fi # Display help
+    if {*,-ENTER}" || "{*,-R} # Reset keypoints
+      rmn keypoints,warp,snapshot,snapshot_view
+      is_snapshot=0 selected_keypoint=-1
+    fi
+    if {*,-F} # Toggle fullscreen
+      if $is_fullscreen w[] ${"fitscreen[] "{*,u,v}},0,0
+      else w[] {*,u,v},0,1
+      fi
+      is_fullscreen:=!$is_fullscreen
+      rmn help
+    fi
+    if {*,-SPACE}" || "{*,-S} # Generate snapshot
+      is_snapshot:=!$is_snapshot
+      rmn snapshot,snapshot_view
+    fi
+    if {*,-G} # Launch GIMP
+      if !$is_snapshot rmn snapshot,snapshot_view fi
+      is_snapshot=1 snapshot_action=gimp
+    fi
+    if {*,-K} # Output keypoints coordinates on stdout
+      +round[keypoints] 0.01
+      +e[] "  > Keypoints: "{_[{^}]}
+      rm.
+    fi
+    if {*,-M} # Mirror mode
+      is_mirror:=!$is_mirror
+    fi
+    if {*,-P} # Print snapshot
+      if !$is_snapshot rmn snapshot,snapshot_view fi
+      is_snapshot=1 snapshot_action=print
+    fi
+    if {*,-U} # Upload to server
+      if !$is_snapshot rmn snapshot,snapshot_view fi
+      is_snapshot=1 snapshot_action=upload
+    fi
+
+    # Manage keypoint presets.
+    repeat 10 { if {*,-$>}" || "{*,-F{$>?$>:10}} rmn keypoints,warp gw_preset$> r. 1,{w/4},1,4,-1  => keypoints fi }
+
+    wait 20
+  while {*}" && "!{*,ESC}" && "!{*,Q}
+  rm
+
+# Definition of keypoint presets.
+gw_preset0 :
+  (0,1,0,1,0.43,0.54,0.49,0.49,0.45,0.53,0.34,0.68,0.47,0.54,0,0,1,1,0.43,0.42,0.53,0.56,0.59,0.58,0.29,0.23,0.75,0.73,\
+   0,1,0,1,0.43,0.54,0.49,0.5,0.45,0.54,0.48,0.6,0.43,0.57,0,0,1,1,0.43,0.42,0.53,0.59,0.59,0.58,0.23,0.29,0.66,0.61)
+
+gw_preset1 :
+  (0,1,0,1,0.47,0.54,0.32,0.69,0.51,0.5,0,0,1,1,0.39,0.39,0.63,0.62,0.89,0.21,0,1,0,1,0.44,0.55,0.41,0.57,0.5,0.48,\
+   0,0,1,1,0.38,0.38,0.57,0.57,0.64,0.16)
+
+gw_preset2 :
+  (0,1,0,1,0.33,0.68,0.53,0.44,0.62,0.5,0,0,1,1,0.39,0.39,0.82,0.75,0.74,0.08,0,1,0,1,0.42,0.53,0.48,0.39,0.58,0.47,\
+   0,0,1,1,0.39,0.39,0.56,0.53,0.53,0.2)
+
+gw_preset3 :
+  (0,1,0,1,0.32,0.71,0.37,0.52,0.66,0.54,0.48,0.59,0.33,0.71,0.54,0,0,1,1,0.4,0.4,0.54,0.73,0.56,0.48,0.48,0.48,0.16,\
+   0.13,0.18,0,1,0,1,0.43,0.53,0.44,0.48,0.52,0.48,0.46,0.52,0.47,0.56,0.53,0,0,1,1,0.38,0.38,0.53,0.57,0.53,0.49,0.48,\
+   0.48,0.22,0.24,0.16)
+
+gw_preset4 :
+  (0,1,0,1,0.32,0.61,0.49,0.05,0.92,0.5,0.51,0.52,0,0,1,1,0.29,0.29,0.67,0.38,0.32,0.11,0.48,0.91,0,1,0,1,0.46,0.55,\
+   0.51,0.35,0.67,0.5,0.53,0.52,0,0,1,1,0.41,0.41,0.58,0.46,0.42,0.17,0.55,0.68)
+
+gw_preset5 :
+  (0,1,0,1,0.64,0.44,0.55,0.55,0.28,0.86,0,0,1,1,0.46,0.46,0.89,0.1,0.45,0.42,0,1,0,1,0.46,0.56,0.52,0.52,0.42,0.66,\
+   0,0,1,1,0.46,0.45,0.73,0.26,0.43,0.42)
+
+gw_preset6 :
+  (0,1,0,1,0.13,0.25,0.37,0.5,0.79,0.85,0.47,0.46,0,0,1,1,0.41,0.42,0.43,0.43,0.45,0.44,0.09,0.83,0,1,0,1,0.47,0.6,\
+   1.43,1.56,1.52,1.42,1.44,1.47,0,0,1,1,0.45,0.46,0.45,0.47,0.48,0.47,0.23,0.75)
+
+gw_preset7 :
+  (0,1,0,1,0.36,0.48,0.51,0.68,0.47,0.53,0.51,0.51,0.23,0.81,0,0,1,1,0.44,0.44,0.44,0.44,0.63,0.63,0.7,0.18,0.08,0.07,\
+   0,1,0,1,0.44,0.48,0.53,0.59,0.47,0.54,0.51,0.51,0.39,0.59,0,0,1,1,0.46,0.46,0.45,0.44,0.6,0.6,0.71,0.27,0.28,0.25)
+
+gw_preset8 :
+  (0,1,0,1,0.48,0.52,0.6,0.35,0.46,0.95,0,0,1,1,0.91,0.03,0.44,0.17,0.78,0.48,0,1,0,1,0.5,0.5,0.38,0.4,0.42,0.63,0,0,\
+   1,1,0.72,0.25,0.42,0.27,0.62,0.44)
+
+gw_preset9 :
+  (0,1,0,1,0.84,0.95,0.31,0.64,0,0,1,1,0.74,0.69,0.63,0.29,0,1,0,1,0.43,-0.09,-0.48,-0.47,0,0,1,1,0.46,-0.55,0.87,0.36)
+
+# Insert logos in selected images
+# $1: Color profile for the GREYC logo (0=light logo & black outline, 1=dark logo & white outline).
+# $2: Size of the logo (in % of the image height).
+gw_insert_logos : skip ${1=0},${2=7.7}
+
+  # Add GREYC logo.
+  images/logo_greyc.png rs. ,{-2,round(h*$2%)} frame. 5,5,0,0,0,0
+  +channels. 100% drgba.. {$1?255:0} /. 255 *.. {$1?0.75:1.5} c.. 0,255
+  +dilate. 5 /. 2 max[-2,-1] a[-2,-1] c
+  0 t. "https://www.greyc.fr",0,0,{-2,h/3},1,1 frame. 2,2,0
+  +dilate. 5 /. 2 max. .. *.. 255 to_rgb.. a[-2,-1] c
+  a[-2,-1] y,0.5
+  s. c,-3 j... ..,1%,1%,0,0,1,. rm[-2,-1]
+
+  # Add G'MIC logo.
+  images/logo_gmic.png rs. ,{-2,round(h*$2%)} to_rgba.
+  frame. 5,5,0,0,0,0
+  s. c,-3 /. 255 *.. .
+  +dilate. 5 /. 2 max[-2,-1] a[-2,-1] c
+  0 t. "https://gmic.eu",0,0,{-2,h/3},1,1 frame. 2,2,0
+  +dilate. 5 /. 2 max. .. *.. 255 to_rgb.. a[-2,-1] c
+  a[-2,-1] y,0.5
+  s. c,-3 j... ..,0.99~,1%,0,0,1,. rm[-2,-1]
+
+  # Add CNRS / ENSICAEN / UNICAEN logos.
+  images/logo_cnrs.png
+  images/logo_ensicaen.png
+  images/logo_unicaen.png
+  rs[-3--1] ,{-4,round(h*$2%)} to_rgba[-3--1] frame[-3--1] 5,5,0,0,0,0
+  if $1 a[-3--1] x else a[-3--1] y fi
+  +channels. 100% drgba.. 255 +dilate. 5 /. 2 max[-2,-1] /. 255
+  j... ..,{-3,[w-w#-1-16,h-h#-1-16]},0,0,1,. rm[-2,-1]
+
+# Normalize frame.
+gw_normalize_image :
+  balance_gamma. 150
+  n. 0,255
+
+# Manage translation.
+gw_tr_en :
+  u "$1"
+
+gw_tr_fr :
+  s="$1"
+  if ['$s']=='"GREYC - Interactive Warp"'
+    u "GREYC - Deformation interactive"
+  elif ['$s']=='"Initialize webcam: try resolution"'
+    u "Initialisation de la webcam: teste r\351solution"
+  elif ['$s']==['"Snapshot"']
+    u "Clich\351"
+  elif ['$s']==['"  Scan this QR-Code\nto download snapshot"']
+    u "  Scannez ce QR-Code\npour t\351l\351charger le clich\351"
+  else u $s
+  fi
+
+gw_joke :
+  jokes=\
+  "Oula ! t'as mauvaise mine !",\
+  "Qu'est ce qu'il t'arrive ? t'es tout boursoufl\351 !",\
+  "Pas assez dormi on dirait ?",\
+  "Tu devrais vraiment arr\352ter avec cette nouvelle cr\350me de jour...",\
+  "Tu t'es battu avec quelqu'un ?",\
+  "Faudrait penser \340 arr\352ter les boissons gazeuses !",\
+  "T'aurais pas un peu pris la grosse t\352te ?",\
+  "Je ne sais pas si c'est \340 cause de ta nouvelle coupe de cheveux,\n mais t'as une dr\364le de t\352te !",\
+  "Au secours, v'l\340 un extra-terrestre !",\
+  "Pas sympa le frelon de t'avoir piqu\351 au visage...",\
+  "Tu me donneras l'adresse de ton chirurgien esth\351tique !",\
+  "T'es pass\351 sous un camion avant d'arriver ?",\
+  "C'est pas possible d'avoir une trogne pareille !",\
+  "Prends un doliprane si t'as mal au cr\342ne !",\
+  "Tu ressemblais pas \340 \347a de loin !",\
+  "Une vrai star de t\351l\351r\351alit\351 !",\
+  "T'as de beaux yeux, tu sais !",\
+  "Vous habitez chez vos parents ?",\
+  "Bonjour, belle andalouse !",\
+  "T'as oubli\351 de mettre ta cr\350me anti-rides ?",\
+  "Ha c'est toi qui jouais dans Frankenstein !",\
+  "Comme \347a, tu ressembles \340 ma belle-m\350re !",\
+  "C'est fou ce que tu vieillis bien !",\
+  "Tu m'excuseras de ne pas t'inviter au restaurant...",\
+  "Sois honn\352te, on te fais souvent des compliments sur ton physique ?",\
+  "Ne t'inqui\350te pas, c'est la beaut\351 int\351rieure qui compte le plus...",\
+  "Picasso t'aurais pris comme mod\350le !",\
+  "Visiblement, tu as repris le boulot toi !",\
+  "Arr\352te de renifler de l'h\351lium !",\
+  "Je te pr\351f\350re au naturel !",\
+  "On a retrouv\351 l'acteur d'Elephant Man !",\
+  "Tiens, une nouvelle esp\350ce d'humains !",\
+  "Allez c'est bon, enl\350ve ton masque !"
+  narg $jokes arg0 int(u(${}+1))%${},$jokes
+
+
+
+# Local Variables:
+# mode: sh
+# End:
+#
+# (End of G'MIC custom commands)
