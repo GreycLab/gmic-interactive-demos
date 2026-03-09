@@ -1,0 +1,383 @@
+#!/usr/bin/env gmic
+#
+#  File        : steamface.gmic
+#                ( G'MIC command file )
+#
+#  Description : The SteamFace Machine
+#                An Interactive Demo for Facial Detection and Analysis, in SteamPunk style.
+#
+#  Copyright   : David Tschumperlé
+#                ( https://tschumperle.users.greyc.fr/ )
+#
+
+# Entrypoint when run from CLI:
+v + steamface $*
+
+#@cli sf_dial : "label",_value,_width>0
+#@cli : Generate a RGBA steampunk dial gfx with specified label, value and width.
+#@cli : $ +sf_dial "Power",45,256
++sf_dial : check "isnum(${2=0}) && isint(${3=512},1)"
+  value:=cut($2,0,100)
+  strvar "$1" varname=${}
+
+  # Init gfx resources.
+  if 0${_dial_is_cached_$varname}
+    ${_dial_bg_$varname} ${_dial_hand_$varname} ${_dial_fg_$varname} remove_resources=0
+  else
+    if narg($dial_bg) remove_resources=0
+    else data/dial_bg_band.png data/dial_hand.png data/dial_fg.png => dial_bg,dial_hand,dial_fg remove_resources=1
+    fi
+    +rs[dial_bg] $3
+    0 t. "$1",0,0,${"font blackchancery,"{round(h#-2/6)}},1,0,0,0,255
+    if w>0.4*w#-2 rs. {round(0.4*w#-2)} fi
+    ja.. .,0.5~,0.65~ rm.
+    +rs[dial_hand] {dial_hand,w*$3/512}
+    +rs[dial_fg] $3
+    => dial_bg_$varname,dial_hand_$varname,dial_fg_$varname
+    +store[-3--1] _dial_bg_$varname,_dial_hand_$varname,_dial_fg_$varname
+    _dial_is_cached_$varname=1
+  fi
+
+  # Render dial gfx.
+  {dial_bg_$varname,[w,h,1,5]}
+  eval[dial_hand_$varname] "
+    begin(
+      angle = lerp(-208,29.5,$value%)°;
+      rot = rot(angle)/2.2;
+      opacity = lerp(0,0.35,$value%);
+      Ch = [ 140,64 ]*$3/480;
+      Cd = [ 260,220 ]*$3/512;
+      Orange = [ 255,128,0 ];
+    );
+    P = round(Cd + rot*([x,y] - Ch));
+    I = I;
+    I(#-1,P)+=[ lerp(I[0,3],Orange,opacity),I[3],1 ]; _0"
+  s. c,-4 max. 1 /[-2,-1] sh. 100% b. 1,0 rm.
+  ja[dial_bg_$varname] . rm.
+  ja[dial_bg_$varname] [dial_fg_$varname],0,0,0,0,0.75
+  rm[-2,-1] => dial_$varname
+  if $remove_resources rm[dial_bg,dial_hand,dial_fg] fi
+
+# Generate little animation to test the 'sf_dial' command.
+sf_test_dial :
+  data/background_title.jpg => background
+  5,1,1,2,v([30,100]) s. c n. -5,5 +. .. a[-2,-1] c +z. 0,0 a[-2,-1] x r. 300,1,1,2,5 n. 0,100 => values
+  repeat {values,w} {
+    [background]
+    +sf_dial G'mic,{values,i($>,0,0,0)},300 ja.. .,218,240 rm.
+    +sf_dial Happiness,{values,i($>,0,0,1)},300 ja.. .,518,240 rm.
+    r. 80%,60%,1,3,0,0,0.5,0.5
+    w. wait 30
+    rm.
+    if !{*}" || "{*,ESC}" || "{*,Q} break fi
+  }
+  rm
+
+#@cli sf_frame
+#@cli : Add a SteamPunk-style frame to the selected images (that must have square dimensions).
+#@cli : $ sp colorful,256 +sf_frame
+sf_frame :
+
+  # Init gfx resources.
+  if 0$_frame_is_cached $_frame
+  else
+    data/frame.png s. c,-3 +b. 3 sqrt. n. 0,255 max[-2,-1] n. 0,255 a[-2,-1] c # Add frame shadow
+    => frame
+    +store. _frame
+    _frame_is_cached=1
+  fi
+  # In original 400x400 frame image, display region is (68,68)-(331,331) -> size (264,264).
+
+  foreach[^-1] {
+    if w!=h r {min(w,h)},1,100%,0,0,0.5,0.5 fi
+    if s!=3 r 100%,100%,1,3 fi
+    100%,100%,1,1,255 a c
+    fw:=max(1,round(w*400/264))
+    if 0${_frame_is_cached_$fw} ${_frame_$fw}
+    else pass. 0 r. $fw,$fw,1,4,2 +store. _frame_$fw _frame_is_cached_$fw=1
+    fi
+    r.. $fw,$fw,1,100%,0,0,0.5,0.5
+    sh 0,2 sh[0,1] 3 j[2] [3],0,0,0,0,1,.,255 or[-2,-1] k[0]
+  }
+  rm.
+
+#@cli sf_camera : _camera_index>=0
+#@cli : Capture camera frame, normalize it and generate camera view (old-style image).
+#@cli : Returns two images named [camera] (size:640x480) and [camera_view] (size: adaptive).
++sf_camera : check "isint(${1=0},0)"
+  camera $1,1,0,640,480 mirror. x => camera
+  +rs[camera] {mask1,[w,h]},3,3 f. ">cut(128 + 50*(i - ia)/id,0,255)"
+  +channels. 1 map. [sepia] j.. .,0,0,0,0,0.75 rm.
+  sh[vignette_warp] 100% f. {(d#$vignette-1)*(1+wave($>/300))/2} rm.
+  +warp[vignette] [vignette_warp],0,1 *[-2,-1] c. 0,255 => camera_view
+
+#@cli sf_steamcloud
+#@cli : Draw an animated steam texture randomly over the selected images.
+sf_steamcloud :
+  if !narg($_steamcloud_t)" || "0$_steamcloud_t>1
+    _steamcloud_x,_steamcloud_y,_steamcloud_w,_steamcloud_t,_steamcloud_dt=-1
+  elif $_steamcloud_t<0" && "g>2.5
+    _steamcloud_x,_steamcloud_y,_steamcloud_w,_steamcloud_t,_steamcloud_dt:=\
+      u,u,v(w#$mask1/2,2*w#$mask1),0,u(0.01,0.05)
+  fi
+  if $_steamcloud_t>=0
+    opacity:=0.85*($_steamcloud_t<0.2?$_steamcloud_t*5:$_steamcloud_t>0.8?(1-$_steamcloud_t)*5:1)
+    pass[steam_seq] 1
+    z:=min(d-1,int(lerp(0,d,cut($_steamcloud_t,0,1))))
+    sh. $z,$z,0
+    $_steamcloud_w,$_steamcloud_w,1,3,255 +r.. $_steamcloud_w,$_steamcloud_w,1,1,1 a[-2,-1] c
+    ja[canvas] .,$_steamcloud_x~,$_steamcloud_y~,0,0,$opacity
+    rm[-3--1]
+    _steamcloud_t+=$_steamcloud_dt
+  fi
+
+#@cli steamface : _is_fullscreen={ 0:No | 1:Yes },_camera_index>=0
+#@cli : Start the SteamFace Machine interactive demonstrator.
+#@cli : Default values: 'is_fullscreen=1' and 'camera_index=0'.
+steamface : check "isbool(${1=1}) && isint(${2=0},0)"
+  rm use_vt100 g=$_vt100_g c=$_vt100_c n=$_vt100_n
+  is_fullscreen,camera_index=${1-2}
+  s0,s1=window,fullscreen
+  e " - Start 'The SteamFace Machine' in "$s$1" mode, using camera \#$2.\n
+------ "${g}"The SteamFace Machine"$n" -----------------------------------\n
+----\n
+---- Key '"${c}"A"$n"' enables/disables automatic mode.\n
+---- Key '"${c}"BACKSPACE"$n"' takes new snapshot on face attributes page.\n
+---- Keys '"${c}"SPACE"$n"' or '"${c}"ENTER"$n"' to go to next page.\n
+---- Keys '"${c}"ESC"$n"' or '"${c}"Q"$n"' to exit.\n
+----\n
+----------------------------------------------------------------\n"
+
+  # Generate background gfx adapted to current screen size and get box coordinates.
+  if $is_fullscreen window_width,window_height={*,u,v} else window_width,window_height=${"fitscreen 1536,1024"} fi
+
+#  window_width,window_height=800,600
+
+  data/background.jpg rs. $window_width,$window_height,3,3 => background
+  data/dial_bg_band.png => dial_bg
+  data/dial_hand.png => dial_hand
+  data/dial_fg.png => dial_fg
+  data/light_red.png => light_red
+  data/light_green.png => light_green
+  data/icon_auto.png => icon_auto
+  data/steam_seq.gmz => steam_seq
+  data/mask.png rs. $window_width,$window_height,1,3
+  eval. ">begin(x1m = y1m = x2m = y2m = inf; x1M = y1M = x2M = y2M = -inf);
+    i==1?(x1m = min(x,x1m); y1m = min(y,y1m); x1M = max(x,x1M); y1M = max(y,y1M));
+    i==2?(x2m = min(x,x2m); y2m = min(y,y2m); x2M = max(x,x2M); y2M = max(y,y2M));
+    end(run('x1m,y1m,x1M,y1M,x2m,y2m,x2M,y2M=',x1m,',',y1m,',',x1M,',',y1M,',',x2m,',',y2m,',',x2M,',',y2M))"
+  +z. $x2m,$y2m,$x2M,$y2M z.. $x1m,$y1m,$x1M,$y1M neq[-2,-1] 0 => mask1,mask2
+  rs[light_red,light_green] {mask1,max(1,round(w/5))}
+  rs[icon_auto] ,{background,max(1,round(h/16))}
+  +f[background] 255 => background_white
+  font_countdown=${"font medievalsharp,512,1"} # Pre-compute font for countdown
+
+  # Pre-compute webcam vignette, scanline deformations and sepia colormap.
+  +erode[mask1] 10 b. 2%,0 sqr. n. 0,1
+  w,h:=w,h $w,$h,1,1,"sin(y)" n. 0,1
+  16,4,1,4,"[ v([ $w,$h ] - 1),0.05*$w*g,0.05*$h*g ]"
+  l. { s y rbf $w,$h,0,0,{[$w,$h]-1} a z + '[x,y]' r. 100%,100%,16,2,5 }
+  warp.. .,0,1,3 rm. n. 1,1.15 rv[-2,-1] *[-2,-1] => vignette
+  100%,100%,1,3,[x,y,0] => vignette_warp
+  (0^0^0,43^27^18,74^46^29,107^66^38,139^90^43,164^113^51,\
+   192^138^74,217^168^108,242^210^169,255^255^255) r. 256,1,1,3,3 => sepia
+
+  # Load face detector and face analysis networks.
+  nn_load data/face_detector.gmz
+  nn_load data/face_analysis.gmz
+
+  # Initialize webcam.
+  camera $camera_index,1,0,640,480 rm.
+  x1s,y1s,x1e,y1e={mask1,"M = max(w,h)/2; [ x0 = $x1m + (w - M)/2, y0 = $y1m + (h - M)/2, x0 + M - 1, y0 + M - 1 ]"}
+
+  # Start user interaction loop.
+  w[background] $window_width,$window_height,0,$is_fullscreen,"Steam Face"
+  is_automode=0
+
+  repeat inf {
+
+    # Step 1 : Face detection.
+    #-------------------------
+    wait -1
+    momented_face_detector=0
+    is_face_detected=0
+    timer_face=-1
+
+    do
+      [background] => canvas
+      +sf_camera $camera_index
+
+      # Get face detector output.
+      if !($>%8)
+        +r[camera] {camera,s=max(w,h)*50%;[s,s]},1,100%,0,0,0.5,0.5 rs. 54 norm.
+        face_detector:=${-nn_lib}"
+          IN = crop(#-1);"\
+          ${_faceds_forward}"
+          nn_store('face0',faceds_C1);
+          nn_store('face1',faceds_NL1);
+          nn_store('face2',faceds_C2);
+          nn_store('face3',faceds_C3);
+          nn_store('face4',faceds_NL3);
+          nn_store('face5',faceds_NL6);
+          100*sigmoid(faceds_OUT[0])"
+        rm.
+      fi
+      momented_face_detector:=lerp($face_detector,$momented_face_detector,0.85)
+      is_face_detected:=$momented_face_detector>=92
+      if $is_face_detected
+        if $timer_face<0 timer_face=$| fi
+      else timer_face=-1
+      fi
+
+      # Draw camera view.
+      j[canvas] [camera_view],$x1m,$y1m,0,0,1,[mask1]
+      rectangle[canvas] $x1s,$y1s,$x1e,$y1e,0.75,0xF0F0F0F0,255
+
+      # Draw some layer outputs of face detector network.
+      siz={mask2,round(max(1,0.22*w))}
+      l[] {
+        ${face0} ${face1} ${face2} ${face3} ${face4} ${face5}
+        channels 0,2 rs $siz n 0,255 sf_frame
+        a[-3--1] x a[-4--2] x a y
+      }
+      ja[canvas] .,{round([$x2m,$y2m]+[0.5*(w#$mask2-w),0.02*(h#$mask2-h)])} rm.
+
+      # Draw face detector dial.
+      siz={mask2,round(max(1,0.7*w))}
+      +sf_dial "Face",$momented_face_detector,$siz
+      x,y:=round([$x2m,$y2m]+[0.5*(w#$mask2-w),0.98*(h#$mask2-h)])
+      ja[canvas] .,$x,$y,0,0,0.7 rm.
+      if $is_face_detected light_color=green else light_color=red fi
+      ja[canvas] [light_$light_color],{$x2m+w#$mask2-w#$light_red-10},$y
+
+      # Draw animated steam cloud.
+      sf_steamcloud
+
+      # Draw countdown.
+      if $is_face_detected" && "$is_automode
+        timer_countdown:=3-($|-$timer_face-3)
+        dec:=$timer_countdown%1
+        if inrange($timer_countdown,0,3)
+          0 t. {ceil($timer_countdown)},0,0,$font_countdown,1,{lerp(255,0,1-$dec)}
+          rs. ,{lerp(24,512,$dec)}
+          100%,100%,1,3,255 rv[-2,-1] a[-2,-1] c
+          xc,yc:=$x1m+({mask1,w}-w)/2,$y1m+({mask1,h}-h)/2
+          ja[canvas] .,$xc,$yc rm.
+        fi
+      else
+        timer_countdown=inf
+      fi
+
+      # Manage automatic mode.
+      if $is_automode" && "$|%2<1 ja[canvas] [icon_auto],0.01~,0.99~,0,0,0.75 fi
+      if {*,-A} is_automode:=!$is_automode timer_face=-1 fi
+
+      # Display frame and wait for event.
+      w[canvas] wait 20
+      rm[canvas,camera,camera_view]
+
+      if $is_face_detected" && "({*,RETURN}" || "{*,SPACE}" || "{*,b}" || "{*,k}==65366)
+        timer_face:=$|-3
+        timer_countdown=0
+      fi
+      is_quit:=!{*}" || "{*,ESC}" || "{*,Q}
+      go_next_step:=$timer_countdown<0.5
+
+    while !($is_quit" || "$go_next_step)
+    if $is_quit break fi
+
+    # Step 2 : Face analysis.
+    #------------------------
+    wait -1
+    40 => momented_face_attributes
+    timer_attributes=$|
+
+    do
+      [background] => canvas
+      flash_opacity:=max(0,1-$|+$timer_attributes)
+      +sf_camera $camera_index
+
+      # Estimate face attributes.
+      if !narg($face_attributes)
+        if !isdir('snapshots') createdir snapshots fi
+        o[camera] snapshots/{`string(v2s(date(0),-4,4),v2s(date(1),-2,2),v2s(date(2),-2,2),\
+                                     v2s(date(4),-2,2),v2s(date(5),-2,2),v2s(date(6),-2,2))`}.jpg,85
+
+        +r[camera] {camera,s=max(w,h)*50%;[s,s]},1,100%,0,0,0.5,0.5 rs. 128 # w2. 400,400
+        eval ${-nn_lib}"IN = crop(#-1)/255;"${_celeba_forward}"store('celeba_OUT',100*sigmoid(celeba_OUT))"
+        rm. $celeba_OUT => face_attributes
+      fi
+      j[momented_face_attributes] [face_attributes],0,0,0,0,0.2
+
+      # Draw camera view.
+      j[canvas] [camera_view],$x1m,$y1m,0,0,1,[mask1]
+      rectangle[canvas] $x1s,$y1s,$x1e,$y1e,0.75,0xF0F0F0F0,255
+
+      # Draw dials for face attributes.
+      # 0:5_o_Clock_Shadow, 1:Arched_Eyebrows, 2:Attractive, 3:Bags_Under_Eyes, 4:Bald, 5:Bangs, 6:Big_Lips,
+      # 7:Big_Nose, 8:Black_Hair, 9:Blond_Hair, 10:Blurry, 11:Brown_Hair, 12:Bushy_Eyebrows, 13:Chubby, 14:Double_Chin,
+      # 15:Eyeglasses, 16:Goatee, 17:Gray_Hair, 18:Heavy_Makeup, 19:High_Cheekbones, 20:Male, 21:Mouth_Slightly_Open,
+      # 22:Mustache, 23:Narrow_Eyes, 24:No_Beard, 25:Oval_Face, 26:Pale_Skin, 27:Pointy_Nose, 28:Receding_Hairline,
+      # 29:Rosy_Cheeks, 30:Sideburns, 31:Smiling, 32:Straight_Hair, 33:Wavy_Hair, 34:Wearing_Earrings, 35:Wearing_Hat,
+      # 36:Wearing_Lipstick, 37:Wearing_Necklace, 38:Wearing_Necktie, 39:Young
+      siz2={mask2,round(max(1,0.45*w))}
+      siz3={mask2,round(max(1,0.27*w))}
+
+      ff_male={face_attributes,i[20]}
+      if $ff_male>50
+        +sf_dial "Male",{momented_face_attributes,i[20]},$siz2
+      else
+        +sf_dial "Female",{momented_face_attributes,100-i[20]},$siz2
+      fi
+      +sf_dial "Youth",{momented_face_attributes,i[39]},$siz2
+      a[-2,-1] x
+
+      +sf_dial "Smile",{momented_face_attributes,i[31]},$siz2
+      +sf_dial "Top Model",{momented_face_attributes,i[2]},$siz2
+      a[-2,-1] x
+
+      +sf_dial "Eyeglasses",{momented_face_attributes,i[15]},$siz3
+      ff_bald,ff_blackhair,ff_blondhair,ff_brownhair,ff_grayhair={face_attributes,[i[4],i[8],i[9],i[11],i[17]]}
+      ff_hairtype:=argmax($ff_bald,$ff_blackhair,$ff_blondhair,$ff_brownhair,$ff_grayhair)
+      if $ff_hairtype==0 +sf_dial "Bald",{momented_face_attributes,max(15,i[4])},$siz3
+      elif $ff_hairtype==1 +sf_dial "Black Hair",{momented_face_attributes,max(35,i[8])},$siz3
+      elif $ff_hairtype==2 +sf_dial "Blond Hair",{momented_face_attributes,max(45,i[9])},$siz3
+      elif $ff_hairtype==3 +sf_dial "Brown Hair",{momented_face_attributes,max(55,i[11])},$siz3
+      elif $ff_hairtype==4 +sf_dial "Gray Hair",{momented_face_attributes,max(65,i[17])},$siz3
+      fi
+      +sf_dial "Hat",{momented_face_attributes,i[35]},$siz3
+      a[-3--1] x
+
+      +sf_dial "Nose",{momented_face_attributes,i[7]},$siz3
+      +sf_dial "Mouth Open",{momented_face_attributes,i[21]},$siz3
+      +sf_dial "Makeup",{momented_face_attributes,i[18]},$siz3
+      a[-3--1] x
+      a[-4--1] y,0.5
+
+      x,y:=round([$x2m,$y2m]+[0.5*(w#$mask2-w),0.5*(h#$mask2-h)])
+      ja[canvas] .,$x,$y,0,0,0.7 rm.
+
+      # Draw animated steam cloud.
+      sf_steamcloud
+
+      # Manage automatic mode.
+      if $is_automode" && "$|%2<1 ja[canvas] [icon_auto],0.01~,0.99~,0,0,0.75 fi
+      if {*,-A} is_automode:=!$is_automode fi
+
+      # Display frame and wait for event.
+      if $flash_opacity j[canvas] [background_white],0,0,0,0,$flash_opacity fi
+      w[canvas] wait 20
+      rm[canvas,camera,camera_view]
+
+      is_quit:=!{*}" || "{*,ESC}" || "{*,Q}
+      go_next_step:={*,RETURN}" || "{*,SPACE}" || "{*,b}" || "{*,k}==65366" || "\
+                    ($is_automode" && "$|>$timer_attributes+20)
+      if {*,k}==65365" || "{*,BACKSPACE} rmn face_attributes fi
+    while !($is_quit" || "$go_next_step)
+    if $is_quit break fi
+    rm[momented_face_attributes,face_attributes]
+    rmn camera,camera_view
+  }
+  rm
+
+# (End of G'MIC custom commands)
