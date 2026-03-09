@@ -32,7 +32,7 @@ gmic-interactive-demos/
 
 ## 🚀 How to Use?
 1. **Prerequisites**:
-   - [G'MIC](https://gmic.eu/) installed (version ≥ 3.7.0), with [OpenCV](https://opencv.org/) support enabled.
+   - [G'MIC](https://gmic.eu/) CLI tool `gmic` installed (_version ≥ 3.7.0_), with [OpenCV](https://opencv.org/) support enabled.
 
 2. **Run a Demo**:
    - Navigate to the demo folder (e.g., `cd steamface`).
