@@ -5,7 +5,7 @@
 ---
 
 ## 🏛 Affiliation
-These interactive demonstrations were developed at **[GREYC](https://www.greyc.fr/)** (UMR CNRS 6072), a joint research unit of **CNRS**, **ENSICAEN**, and **Université de Caen Normandie**. The project reflects the laboratory's commitment to open science, creative computing, and public engagement in research.
+These interactive demonstrations were developed at **[GREYC](https://www.greyc.fr/)** (UMR CNRS 6072), a joint research unit of [**CNRS**](https://www.cnrs.fr/), [**ENSICAEN**](https://www.ensicaen.fr/), and [**Université de Caen Normandie**](https://www.unicaen.fr/). The project reflects the laboratory's commitment to open science, creative computing, and public engagement in research.
 
 ---
 
@@ -32,7 +32,7 @@ gmic-interactive-demos/
 
 ## 🚀 How to Use?
 1. **Prerequisites**:
-   - [G'MIC](https://gmic.eu/) installed (version ≥ 3.7.0).
+   - [G'MIC](https://gmic.eu/) installed (version ≥ 3.7.0), with [OpenCV](https://opencv.org/) support enabled.
 
 2. **Run a Demo**:
    - Navigate to the demo folder (e.g., `cd steamface`).
