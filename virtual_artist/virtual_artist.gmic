@@ -1,0 +1,1011 @@
+#!/usr/bin/env gmic
+#
+#  File        : virtual_artist.gmic
+#                ( G'MIC command file )
+#
+#  Description : Interactive demo for image stylization
+#                ( https://gmic.eu )
+#
+#  Copyright   : David Tschumperle
+#                ( https://tschumperle.users.greyc.fr/ )
+#
+#  Licenses    : This file is 'dual-licensed', you have to choose one
+#                of the two licenses below to apply.
+#
+#                CeCILL-C
+#                The CeCILL-C license is close to the GNU LGPL.
+#                ( http://www.cecill.info/licences/Licence_CeCILL-C_V1-en.html )
+#
+#            or  CeCILL v2.1
+#                The CeCILL license is compatible with the GNU GPL.
+#                ( http://www.cecill.info/licences/Licence_CeCILL_V2.1-en.html )
+#
+#  This software is governed either by the CeCILL or the CeCILL-C license
+#  under French law and abiding by the rules of distribution of free software.
+#  You can  use, modify and or redistribute the software under the terms of
+#  the CeCILL or CeCILL-C licenses as circulated by CEA, CNRS and INRIA
+#  at the following URL: "http://www.cecill.info".
+#
+#  As a counterpart to the access to the source code and  rights to copy,
+#  modify and redistribute granted by the license, users are provided only
+#  with a limited warranty  and the software's author,  the holder of the
+#  economic rights,  and the successive licensors  have only  limited
+#  liability.
+#
+#  In this respect, the user's attention is drawn to the risks associated
+#  with loading,  using,  modifying and/or developing or reproducing the
+#  software by the user in light of its specific status of free software,
+#  that may mean  that it is complicated to manipulate,  and  that  also
+#  therefore means  that it is reserved for developers  and  experienced
+#  professionals having in-depth computer knowledge. Users are therefore
+#  encouraged to load and test the software's suitability as regards their
+#  requirements in conditions enabling the security of their systems and/or
+#  data to be ensured and,  more generally, to use and operate it in the
+#  same conditions as regards security.
+#
+#  The fact that you are presently reading this means that you have had
+#  knowledge of the CeCILL and CeCILL-C licenses and that you accept its terms.
+#
+
+# Entrypoint when run from CLI:
+go $*
+
+# $1 = screen_mode={ 0=windowed | 1=fullscreen | 2=touchscreen }
+# $2 = 0.25<=screen_resolution_factor<=1
+# $3 = locale
+go : check "isint(${1=0}) && $1>=0 && $1<=2 && ${2=0.5}>=0.25 && $2<=1" skip "${3=fr}"
+  v -
+  m "rmn : nmd $\"*\" rm[${}]"
+  m "tr : tr_$3 $\"*\""
+
+  time0=$|
+
+  # Initialize display window.
+  _W,_H={round([{*,u},{*,v}]*$2)}
+  if $1 # Fullscreen or Touchscreen
+    w {*,u,v},0,1,"Virtual Artist"
+    if $1==2 cursor 0 fi
+  else # Non-Fullscreen
+    w $_W,$_H,0,0,"Virtual Artist"
+  fi
+
+  is_camera=0 l[] camera 0 camera 0,0 rm is_camera=1 onfail done # Detect webcam.
+  _label_cached=${"tr \"Please wait, caching files.\""}
+
+  # Create background.
+  image/blue_background.jpg
+  rs. $_W,$_H,3,2 r. $_W,$_H,1,3,0,0,0.5,0.5
+  rgb2hsv. f. "[i0 - 40*y/h,i1*min(1,0.2+y/h),i2*min(0.5,3*y/h)]" hsv2rgb.
+
+  # Add GREYC logo.
+  image/logo_greyc.png rs. ,{-2,h/13} to_rgba.
+  frame. 5,5,0,0,0,0
+  s. c,-3 /. 255 *.. . *.. 2 c.. 0,255
+  dilate. 5 a[-2,-1] c
+  0 t. "https://www.greyc.fr",0,0,{-2,h/3},1,1
+  channels. -3,0 f. "[255,255,255,A]"
+  a[-2,-1] y,0.5
+  s. c,-3 j[0] ..,1%,1%,0,0,1,. rm[-2,-1]
+
+  # Add G'MIC logo.
+  image/logo_gmic.png rs. ,{-2,h/13} to_rgba.
+  frame. 5,5,0,0,0,0
+  s. c,-3 /. 255 *.. .
+  dilate. 5 a[-2,-1] c
+  0 t. "https://gmic.eu",0,0,{-2,h/3},1,1
+  channels. -3,0 f. "[255,255,255,A]"
+  a[-2,-1] y,0.5
+  s. c,-3 j[0] ..,0.99~,1%,0,0,1,. rm[-2,-1]
+  +store _background
+
+  iteration=0
+  do l
+
+    # Surprise animation
+    if $iteration" && "!($iteration%10) l[]
+      if !narg($Nanim) Nanim=8 fi
+      anim_${"arg0 "{$Nanim%9}",fire,fireworks,bouncing,rubber3d,reflection3d,metaballs3d,starfield3d,waves,light"}
+      Nanim+=1 rm
+    done fi
+
+    # Title page.
+    if !($iteration%5)
+      image/title.png nm. ""
+      va_interface[0] [1],"",{!$iteration?2:1},8,0,0,0,{$1==2}
+      k[0]
+    fi
+
+    # Select input image.
+    l[0]
+      l[] ig input/*.jpg done # onfail done
+      l[] ig input/*.png done # onfail done
+      if $is_camera rm. image/webcam.png nm. "From Camera" fi
+      va_interface[0] [1--1],"Select an image...",{!$iteration?2:1},15,5,0,{$!-2-$is_camera},{$1==2}
+      input=${}
+      camera_selected={$is_camera" && "$input==$!-2}
+      k[0,{1+$input}]
+    done
+    if $input<0 k[0] iteration+=1 continue fi
+
+    # Get image from webcam if necessary
+    if $camera_selected
+      rm. +to[0] "Camera Capture",0.5~,0.1%,7%,3,0.85,255,128,0
+      time_idle=$|
+      do
+        camera 0
+        frame. {v=max(w,h)*1%;[v,v]},255
+        rs. {0.8*[$_W,$_H]},3,0
+        +j[1] .,0.5~,0.7~ rm..
+        w. rm. wait 80
+      while {*}" && "!{*,b}" && "$|-$time_idle<10
+      rm.
+      camera 0
+      camera 0,0
+      rs. 1280
+      +ac. "equalize. 256",ycbcr_y blend[-2,-1] alpha,0.5
+    fi
+
+    # Select style image.
+    l[0]
+      l[] ig style/*.jpg done # onfail done
+      l[] ig style/*.png done # onfail done
+      va_interface[0] [1--1],"Choose a style...",{!$iteration?2:1},10,5,0,{$!-2},{$1==2}
+      style=${}
+      k[0,{1+$style}]
+    done
+    if $style<0 k[0] iteration+=1 continue fi
+
+    # Run stylization algorithm.
+    rv[-2,-1]
+    params=1,5,0,0,0.5,2,3,0.5,0.1,3,5,0,0.7,1,0,1,0,5,5,7,1,60,10,2,1.85,0
+    filename_params=style/{b}.params
+    if isfile(['$filename_params']) i raw:$filename_params,uint8 params=${"u "{t}} rm. fi
+    +va_fx_stylize[-2,-1] $params
+    rm.
+
+    # Display result.
+    frame[-3,-2] {v=max(w,h)*0.5%;[v,v]},0 montage[-3,-2] X
+    nm[-2,-1] "Image & Style","Result"
+    va_interface[0] [1--1],"",0,8,15,1,1,{$1==2}
+    selection=${}
+
+    k[0]
+    iteration+=1
+
+  # onfail rm $_background done # Rescue mode!
+  done
+  while {*}" && "!{*,ESC} # " && "$|-$time0<14400
+  rm w 0 v +
+
+# va_interface[background] : [images],"title",cache_thumbnails={ 0=no | 1=yes | 2=yes (force caching)},\
+# delay_autoselect1>=0,delay_autoselect2,min_autoselect>=0,max_autoselect>=0,is_touchscreen={ 0=no | 1=yes }
+# User interface to select/view a list of images.
+va_interface : skip "${2=}"
+  pass$1 0 N={$!-1}
+  is_title={['"$2"']!=0}
+  if $is_title +to[0] ${"tr \"$2\""},0.5~,0.1%,7%,3,0.85,255,128,0 else [0] fi
+  nm. bg mv. 1
+
+  # Estimate thumbnail size and positions.
+  nb_cols,nb_rows={v=floor(sqrt($N));[ceil($N/v),v]}
+  w,h={int([0.95*$_W/$nb_cols,0.85*$_H/$nb_rows])}
+  offx,offy={bg,[(w-($nb_cols-1)*$w)/2,(h-($nb_rows-1)*$h)/($is_title?1.5:1.8)]}
+  repeat $N x$>,y$>,o$>={i=$>;[$offx,$offy]+[i%$nb_cols,int(i/$nb_cols)]*[$w,$h]},1 done
+
+  # Read cached data, if previously computed.
+  filename_cached={/${-path_tmp}}${"strclut \"va_cached_$2\""}.gmz
+  if $3==1" && "isfile(['$filename_cached']) i $filename_cached
+  else
+
+    # Not cached, generate thumbnails.
+    +l[2--1] repeat $N l[$>]
+      if $3 va_progress_cache fi
+      va_thumbnail {[$w,$h]*($N==1?0.4:1)},2
+      nm thumb$>
+      done done
+
+      # Generate selection masks and sprite.
+      repeat $N +l[thumb$>]
+        channels. 100% r. 150%,150%,1,100%,0,0,0.5,0.5 b. {min(w,h)*5%} n. 0,255 round. autocrop.
+      done nm selmask$> done
+      round if $3 o $filename_cached fi
+    done
+    foreach[2--1] { ('{n}') replace_str. "_c1","" nm={t} rm. => $nm }
+  fi
+
+  # Insert 'Next' icon.
+  image/icon_next.png s. c,-3 /. 255
+  nm[-2,-1] icon_next,icon_next_alpha
+
+  # Insert 'Insert Coin' icon.
+  if $N==1
+    0 t. ${"tr \"- Insert Coin -\""},0,0,{min(64,$_H/16)},1,1 100%,100%,1,3,[255,255,0] rv[-2,-1]
+    nm[-2,-1] icon_coin,icon_coin_alpha
+  fi
+
+  # Rename fullsize images.
+  l[2-{1+$N}] repeat $N
+    name$>= name={$>,b}
+    l[] ({'$name'}) replace_str. "_c1","" name$>={t} rm onfail done
+    nm[$>] img$>
+  done done
+
+  # Start user interaction loop.
+  {bg,[w,h]} nm. bg_label
+  selection,dt_selected,dt_deselected=-1,0,0
+  dt_fadeout=0
+  time_fadein=$|
+  time_fadeout=
+  time_selected=
+  time_deselected=
+  time_idle=
+  time_autoselected=
+  omx,omy,omb=-1
+
+  do
+    fill[bg_label] 0 rectangle. 0,0,{w/5},{h/7},1,-2
+
+    # Render and display current view.
+    [bg]
+    repeat $N
+      xt,yt,wt,ht=${x$>},${y$>},{thumb$>,[w,h]}
+      opacity,opacity_mask,is_centered=1,1,0
+
+      if narg($time_selected)" || "narg($time_deselected) # Manage selection/deselection animation
+        if narg($time_deselected) dt_deselected={min(1,2*($|-$time_deselected))} dt={1-$dt_deselected}
+        else dt_selected={min(1,1.5*($|-$time_selected))} dt=$dt_selected
+        fi
+
+        if $selection==$>
+          if !narg($selzoomed)
+            [img$>] nm. ${name$>}
+            va_thumbnail. {[$_W,$_H]*($N==1?0.5:0.9)},1
+            nm. selzoomed mv. -3
+          fi
+          xt,yt={bg,"
+            const dt = "$dt";
+            omdt = 1 - dt;
+            [ "$xt"*omdt + dt*w/2,
+              "$yt"*omdt + dt*h/1.8 ]"}
+          opacity_mask={max(0,1-$dt)}
+          selzoomw,selzoomh={selzoomed,[w,h]*$dt+(1-$dt)*[$wt,$ht]}
+
+        else
+          xt,yt={bg,"
+            const dt = "$dt";
+            const omdt = 1 - dt;
+            xc = "$xt" - w/2;
+            yc = "$yt" - h/2;
+            R = sqrt(xc^2 + yc^2);
+            a = atan2(yc,xc);
+            T = [ w,h ]/2 + 2*R*[ cos(a),sin(a) ];
+            [ "$xt","$yt" ]*omdt + dt*T"}
+          opacity={max(0,1-$dt)}
+        fi
+      fi
+      yt={round($yt+5*sin(1*$>+2*$|))}
+
+      if $selection==$>" && "$opacity_mask>0 # Draw selection mask
+        if $dt>0
+         +r[selmask$>] {selmask$>,[$selzoomw*w/$wt,$selzoomh*h/$ht]},1,100%,1
+          .,.,1,3,255
+          j... .,{[$xt,$yt]-[w,h]/2},0,0,$opacity_mask,..,255
+          rm[-2,-1]
+        else
+          [selmask$>],[selmask$>],1,3,255
+          j.. .,{[$xt,$yt]-[w,h]/2},0,0,$opacity_mask,[selmask$>],255 rm.
+        fi
+      fi
+
+      if $selection==$>" && "($dt_selected>0" || "$dt_deselected>0) # Draw thumbnail
+        +r[selzoomed] $selzoomw,$selzoomh,1,100%,1
+        s. c,-{s-1}
+        j... ..,{[$xt,$yt]-[w,h]/2},0,0,1,.,255
+        !=. 0 j[bg_label] .,{[$xt,$yt]-[w,h]/2},0,0,1,.
+        rm[-2,-1]
+
+        # Display 'next' icon
+        if !narg($opac_next) opac_next=0 fi
+        if $dt_selected==1" && "!$dt_deselected" && "!narg($time_autoselected)
+          if !narg($r_icon_next)
+            +rs[icon_next,icon_next_alpha] ,{h/6}
+            nm[-2,-1] r_icon_next,r_icon_next_alpha mv[-2,-1] -6
+          fi
+          opac_next={min(1,$opac_next+0.05)}
+        elif $dt_deselected
+          opac_next=0
+        fi
+        if narg($r_icon_next)" && "$N>1" && "$opac_next>0
+          coords={r_icon_next,[$xt+$selzoomw/2-w/2,$yt-h/2]}
+          j. [r_icon_next],$coords,0,0,$opac_next,[r_icon_next_alpha]
+          +!=[r_icon_next_alpha] 0 j[bg_label] .,$coords,0,0,1,. rm.
+        fi
+
+      else
+        +channels[thumb$>] 100%
+        j.. [thumb$>],{[$xt,$yt]-[w,h]/2},0,0,$opacity,.,255
+        if !$dt_selected !=. 0 j[bg_label] .,{[$xt,$yt]-[w,h]/2},0,0,-{1+$>} fi
+        rm.
+      fi
+    done
+
+    if narg($icon_coin)" && "ceil($|)%2
+      j. [icon_coin],0.5~,0.95~,0,0,0.75,[icon_coin_alpha]
+    fi
+
+    # Manage fade-in and fade-out.
+    if narg($time_fadeout)
+      dt_fadeout={min(1,4*($|-$time_fadeout))}
+      j. [bg],0,0,0,0,$dt_fadeout
+    else
+      dt_fadein={min(1,2*($|-$time_fadein))}
+      if $dt_fadein<1 j. [bg],0,0,0,0,{1-$dt_fadein} fi
+    fi
+
+    # Manage user interaction.
+    mx,my,mb={round([{*,x,y}]*[w#0,h#0]/[{*,w,h}])},{*,-b}
+    if $mx!=$omx" || "$my!=$omy" || "$mb!=$omb time_idle=$| time_autoselected= fi
+    if $8" && "$mx>=0" && "$omx>=0" && "(abs($mx-$omx)>$w" || "abs($my-$omy)>$h) # Emulate button for touchscreen
+      mb=1
+    fi
+    omx,omy,omb=$mx,$my,$mb
+
+    if {bg_label,$mb&1" && "i($mx,$my)==-2} break fi
+
+    if !$dt_selected" && "!$dt_deselected # Initial state: check for selection
+      selection={bg_label,round(i($mx,$my)-1)}
+      if $selection>=0" && "$mb&1 time_selected=$| fi
+
+    elif $dt_selected==1" && "!$dt_deselected" && "!narg($time_fadeout) # End of selection: test what happens next
+      if {bg_label,$mb&1" && "i($mx,$my)} # Validate selection
+        time_fadeout=$|
+      elif {bg_label,$mb&1" && "!i($mx,$my)} # Invalidate selection
+        time_deselected=$|
+        time_selected=
+        dt_selected=0
+      fi
+
+    elif $dt_deselected==1 # End of deselection: go back to initial state
+      time_deselected=
+      dt_deselected=0
+      selection=-1
+      time_idle=$|
+      rmn selzoomed,r_icon_next,r_icon_next_alpha
+    fi
+
+    # Manage auto-selection.
+    if !narg($time_autoselected)" && "$|-$time_idle>(narg($time_selected)?$5:$4) time_autoselected=$| fi
+
+    if narg($time_autoselected)
+      dt_autoselected={$|-$time_autoselected}
+
+      if !$dt_selected
+        selection={round(u($6,$7))}
+        time_selected,time_autoselected=$|
+
+      elif $dt_selected==1" && "!$dt_deselected" && "$dt_autoselected>$5" && "!narg($time_fadeout)
+        time_fadeout=$|
+      fi
+    fi
+
+    w. rm. wait 40
+  while {*}" && "!{*,ESC}" && "$dt_fadeout<1
+
+  k[0]
+  if narg($time_selected) u $selection else u -1 fi
+
+# Generate thumbnail with maximal size $1x$2, and interpolation type $3
+va_thumbnail :
+  repeat $! l[$>]
+    rs $1,$2,$3,0
+    frame {v=max(w,h)*1%;[v,v]},255
+    to_rgba
+    name={0,b}
+    l[]
+      label1="" label2=""
+      ({'$name'})
+      replace_str "_c2",""
+      s +,{'" ("'}
+      if $!==1 label1={0,t} label2=""
+      elif $!>1 autocrop[1] {'" "'} a[1--1] y replace_str. "(","( " replace_str ")"," )" label1={0,t} label2={1,t}
+      fi
+      rm
+    onfail
+    done
+
+    if ['$label1']!=0
+      0 t. ${"tr \""$label1"\""},0,5,{min($_H/18,$2/5)},1,255,255,255,255
+      autocrop. expand. y,5,0 r. 100%,100%,1,4 a y,0.5
+    fi
+    if ['$label2']!=0
+      0 t. ${"tr \""$label2"\""},0,5,{min($_H/20,$2/6)},1,255,255,0,255
+      autocrop. r. 100%,100%,1,4 a y,0.5
+    fi
+    frame 1%,5%,0,0,0,0
+    rs $1,$2,2,0
+  done done
+
+#@cli va_stylize : [style_image],_fidelity_finest,_fidelity_coarsest,_fidelity_smoothness_finest>=0,\
+# _fidelity_smoothnes_coarsest>=0,0<=_fidelity_chroma<=1,_init_type,_init_resolution>=0,init_max_gradient>=0,\
+# _patchsize_analysis>0,_patchsize_synthesis>0,_patchsize_synthesis_final>0,_nb_matches_finest>=0,\
+# _nb_matches_coarsest>=0,_penalize_repetitions>=0,_matching_precision>=0,_scale_factor>1,_skip_finest_scales>=0,\
+# "image_matching_command"
+#@cli : Transfer colors and textures from specified style image to selected images, using a multi-scale \
+# patch-mathing algorithm.
+#@cli : If instant display window[0] is opened, the steps of the image synthesis are displayed on it.
+#@cli : 'init_type' can be { 0=best-match | 1=identity | 2=randomized}.
+va_stylize :
+  check ${"is_image_arg $1"}" && isnum(${2=0.25}) && isnum(${3=2}) && ${4=3}>=0 && ${5=0.5}>=0 && ${6=0.1}>=0 && "\
+        "$6<=1 && isint(${7=0}) && $7>=0 && $7<=3 && isint(${8=16}) && $8>=0 && ${9=0}>=0 && isint(${10=5}) && "\
+        "$10>0 && isint(${11=5}) && $11>0 && isint(${12=$11}) && $12>0 && isint(${13=2}) && isint(${14=30}) && "\
+        "${15=10}>=0 && ${16=2}>=0 && ${17=1.85}>1 && isint(${18=0})>=0"
+  skip "${19=s c,-3 match_histogram[0] [2] b[0,2] xy,0.7 n[0,2] 0,255 n[1,2] 0,200 a[0,1] c a[1,2] c}"
+  e[^-1] "Stylize image$? with style image $1."
+  v -
+  fidelity_finest,\ # $2
+  fidelity_coarsest,\ # $3
+  fidelity_smoothness_finest,\ # $4
+  fidelity_smoothness_coarsest,\ # $5
+  fidelity_chroma,\ # $6
+  init_type,\ # $7
+  init_resolution,\ # $8
+  init_max_gradient,\ # $9
+  patchsize_analysis,\ # $10
+  patchsize_synthesis,\ # $11
+  patchsize_synthesis_final,\ # $12
+  nb_matches_finest,\ # $13
+  nb_matches_coarsest,\ # $14
+  penalize_repetitions,\ # $15
+  matching_precision,\ # $16
+  scale_factor,\ # $17
+  skip_finest_scales=${2-18} \ # $18
+  m "stylize_match : $19"
+
+  init_resolution={max(2*$patchsize_analysis,$init_resolution)}
+  mprec0={round(2+1.5*$matching_precision)}
+  mprec1={1+round(4*$matching_precision)}
+  is_window={*}
+
+  pass$1 repeat $!-1 l[$>,-1]
+    to_colormode.. {s}
+    nb_scales={1+round(log(min(w#0,h#0,w#1,h#1)/$init_resolution)/log($scale_factor),1,-1)}
+
+    repeat $nb_scales scale=$>
+      size_factor={100/($scale_factor^$<)}
+      if !$scale
+
+        # Initialization.
+        +r[0,1] $size_factor%,$size_factor%,100%,100%,2 ws,hs={-2,[w,h]}
+        +to_color[0,1] channels[-2,-1] 0,2 gradient_norm[-2,-1]
+        r. [-3],[-3],[-3],1,2 r.. [-4],[-4],[-4],1,2
+        a[-3,-1] c a[-3,-1] c # Append gradient information as last channel
+        stylize_match[-2,-1]
+        if $init_type==0
+          +matchpatch.. .,3,3,1,{2*$mprec0},{2*$mprec1},$penalize_repetitions # Initial image match with 3x3 patches
+        else
+          ..,..,1,2,"round([x,y]*([w#-1,h#-1]-1)/([w,h]-1))" # Identity
+          if d#-2>1 channels. 0,2 fi
+          if $init_type==2 eval. ">P = u([w,h]-1); tmp = I(P); I(P) = I; I() = tmp" fi # Randomize
+        fi
+        rm[-3,-2]
+        if $init_max_gradient>0 # Keep only high gradients of target image
+          +gradient_norm[0] r. ..,..,1,1,2 gt. $init_max_gradient
+          +.. 1 *[-2,-1] _inpaint_warping2d. --. 1
+        fi
+        if $is_window" && "!{*} break fi
+
+      else
+
+        # Upscale.
+        factor={1-($scale-1)/max(1,$nb_scales-2)} # Linear scale factor from 1 to 0
+        +r[0,1] $size_factor%,$size_factor%,100%,100%,2
+        +to_color[-2,-1] channels[-2,-1] 0,2 gradient_norm[-2,-1]
+
+        a[-3,-1] c a[-3,-1] c # Append gradient information as last channel
+        stylize_match[-2,-1] mv[-2,-1] -3
+        sh. 0 *. {-3,w/$ws} rm. sh. 1 *. {-3,h/$hs} rm. round.
+        r. ...,...,1,100%,1
+        ws,hs={-2,[w,h]}
+
+        if $<<$skip_finest_scales rm[-3,-2] continue fi  # Skip finest scales
+        +warp_patch.. .,$patchsize_synthesis,$patchsize_synthesis,1
+
+        # Inject gradients from target (in Lab colorspace).
+        fidelity={max(0,$fidelity_finest+($fidelity_coarsest-$fidelity_finest)*$factor)}
+        fidelity_smoothness={$fidelity_smoothness_finest+\
+                             ($fidelity_smoothness_coarsest-$fidelity_smoothness_finest)*$factor}
+
+        if $fidelity>0.1
+          sh. 0,2 sh[-5] 0,2 +gradient_norm[-2,-1] rm[-4,-3] # Gradient norm on colors only
+          *. $fidelity argmax[-2,-1] b. xy,$fidelity_smoothness n. 0,{min(1,$fidelity)}
+          sh[-5,-2] 0,2 srgb2lab[-2,-1] rm[-2,-1]
+          +*. $fidelity_chroma r. 100%,100%,1,2,1 a[-2,-1] c j.. [-5],0,0,0,0,1,. rm.
+          sh. 0,2 lab2srgb. rm.
+        fi
+        rm[-4]
+
+        # Iterate patch-matching steps.
+        nb_matches={max(0,round($nb_matches_finest+($nb_matches_coarsest-$nb_matches_finest)*$factor^2))}
+        nb_scales1={$nb_scales-1}
+        nb_matches1={$nb_matches-1}
+        if {*}
+          +rs. {0.8*[$_W,$_H]},1,0 frame. {v=max(w,h)*1%;[v,v]},255
+          $_background j. ..,0.5~,0.8~ rm..
+          to. ${"tr \"Virtual Artist is painting!\n"\
+              "   ( Scale \""}$scale/$nb_scales1": 0% )",0.5~,3%,{max(16,$_H/32)}
+          w. rm.
+        fi
+
+        repeat $nb_matches
+          matchpatch. ...,$patchsize_analysis,$patchsize_analysis,1,$mprec0,$mprec1,$penalize_repetitions,0,..
+          rm.. +warp_patch.. .,$patchsize_synthesis,$patchsize_synthesis,1
+          if {*}" && "(!($>%5)" || "$nb_matches<=10)
+            +rs. {0.8*[$_W,$_H]},1,0 frame. {v=max(w,h)*1%;[v,v]},255
+            $_background j. ..,0.5~,0.8~ rm..
+            to. ${"tr \"Virtual Artist is painting!\n"\
+                "   ( Scale \""}$scale/$nb_scales1": "{round(100*($>+1)/$nb_matches)}"% )",0.5~,3%,{max(16,$_H/32)}
+            w. rm.
+          fi
+          if $is_window" && "!{*} break fi
+        done
+        rm[-3,-1]
+      fi
+      if $is_window" && "!{*} break fi
+    done
+    if $is_window" && "!{*} k[0,1] break fi
+
+    # Do final rendering.
+    +warp_patch[1] .,$patchsize_synthesis_final,$patchsize_synthesis_final,1 c. 0,255
+    rv[0,-1] rm[-2,-1]
+  done done rm.
+  uncommand stylize_match
+  v +
+
+va_fx_stylize : l[] if !narg($$stylize) _fx_stylize_ fi onfail done
+  init_resolution={arg0($16,8,16,32,64,128,256)}
+
+  # Define image matching function
+  colorspace=${"arg0 $11,all,lrgb,ycbcr,ycbcr,ycbcr_y,ycbcr_cbcr,lab,lab,lab_l,lab_ab"}
+  match_colors="s c,-3 mv[1] 3 b[-2,-1] 1% negate[-2,-1] n[-2,-1] 0,1"
+  luma,chroma=
+  if $11==3" || "$11==7 # Chroma/Luma conversion for YCbCr or Lab
+    luma=_${"arg0 ($11==7),y,l"}
+    chroma=_${"arg0 ($11==7),cbcr,ab"}
+  fi
+  if $10==1
+    match_colors=$match_colors" ac[0,1] \"balance_gamma ,\","$colorspace$luma
+    if narg($chroma) match_colors=$match_colors" ac[0,1] \"balance_gamma ,\","$colorspace$chroma fi
+  elif $10==2
+    match_colors=$match_colors" match_histogram[0] [1],256,"$colorspace$luma
+    if narg($chroma) match_colors=$match_colors" match_histogram[0] [1],256,"$colorspace$chroma fi
+  elif $10==3
+    match_colors=$match_colors" match_pca[0] [1],"$colorspace$luma" c[0] 0,255"
+    if narg($chroma) match_colors=$match_colors" match_pca[0] [1],"$colorspace$chroma" c[0] 0,255" fi
+  fi
+  if $12==1 match_colors=$match_colors" rgb2ycbcr[0,1] sh[0,1] 1,2 f[-2,-1] 128 rm[-2,-1] ycbcr2rgb[0,1]"
+  elif $12==2 match_colors=$match_colors" srgb2lab[0,1] sh[0,1] 1,2 f[-2,-1] 0 rm[-2,-1] lab2srgb[0,1]"
+  elif $12==3 match_colors=$match_colors" rgb2ycbcr[0,1] sh[0,1] 0 f[-2,-1] 128 rm[-2,-1] ycbcr2rgb[0,1]"
+  elif $12==4 match_colors=$match_colors" srgb2lab[0,1] sh[0,1] 0 f[-2,-1] 50 rm[-2,-1] lab2srgb[0,1]"
+  fi
+  match_colors=$match_colors\
+              " b[0,1] xy,$13 repeat 2 l[$>] s c n 0,255 a c done done *[-2,-1] {$14*255} a[0,-2] c a[1,-1] c"
+
+  patch_penalization=$23
+
+  # colorspace=${"arg0 $11,all,lrgb,ycbcr,ycbcr_y,ycbcr_cbcr,lab,lab_l,lab_ab"}
+  # match_colors="s c,-3 mv[1] 3 b[-2,-1] 1% negate[-2,-1] n[-2,-1] 0,1"
+  # if $10==1 match_colors=$match_colors" ac[0,1] \"balance_gamma ,\","$colorspace
+  # elif $10==2 match_colors=$match_colors" match_histogram[0] [1],256,"$colorspace
+  # fi
+  # if $12==1 match_colors=$match_colors" rgb2ycbcr[0,1] sh[0,1] 1,2 f[-2,-1] 128 rm[-2,-1] ycbcr2rgb[0,1]"
+  # elif $12==2 match_colors=$match_colors" srgb2lab[0,1] sh[0,1] 1,2 f[-2,-1] 0 rm[-2,-1] lab2srgb[0,1]"
+  # elif $12==3 match_colors=$match_colors" rgb2ycbcr[0,1] sh[0,1] 0 f[-2,-1] 128 rm[-2,-1] ycbcr2rgb[0,1]"
+  # elif $12==4 match_colors=$match_colors" srgb2lab[0,1] sh[0,1] 0 f[-2,-1] 50 rm[-2,-1] lab2srgb[0,1]"
+  # fi
+  # match_colors=$match_colors\
+  #             " b[0,1] xy,$13 repeat 2 l[$>] s c n 0,255 a c done done *[-2,-1] {$14*255} a[0,-2] c a[1,-1] c"
+
+  # patch_penalization=$23
+  # if $_version<271 patch_penalization*=500 fi
+
+  # Insert style image at the end of the list.
+  if $1<2 # Custom style (top or bottom layer)
+    if $!<2 error "At least two layers are required in this mode." fi
+    ind_first={$1==0?1:0} ind_style={$1==0?0:-1} N={$!-1} sh[$ind_style]
+  else
+    ind_first=0 N=$! ind_style= _fx_stylize {$1-2}
+  fi
+
+  # Process layers.
+  is_window=0
+  repeat $N l[{$ind_first+$>},-1] nm={0,n}
+    if $2 +rs[1] {0,[w,h]*arg1($2,0.1,0.2,0.3,0.5,0.75,1,1.5,2,2.5,3)},2,2 fi
+    if $3==1 . +mirror. x +mirror[-2,-1] y a[-4--1] z
+    elif $3==2 +l. r {u={max(w,h)};[u,u]},1,100%,0,3,0.5,0.5 repeat 3 +rotate[0] {90*$>},1,3,50%,50% done a z done
+    elif $3==3 +l. r {u={max(w,h)};[u,u]},1,100%,0,3,0.5,0.5 repeat 7 +rotate[0] {45*$>},1,3,50%,50% done a z done
+    fi
+    va_stylize[0] .,${5-9},$15,$init_resolution,${17-22},$patch_penalization,${24-26},$match_colors
+    k[0,1] nm[0] $nm0
+    if $is_window" && "!{*} break fi
+  done done
+  rm. # Remove style image
+  if 0$_output_mode
+    if narg($ind_style) rm[$ind_style] fi # Do not duplicate style layer if output mode -> new layers
+    if $is_window" && "!{*} rm fi # In case user closed the window, does not output new layers.
+  fi
+
+va_progress_cache :
+  $_W,$_H t. $_label_cached,1%,1%,3%,1,255 w. rm. _label_cached.=" ."
+
+# Manage translation.
+tr_en :
+  u "$1"
+
+tr_fr :
+  s="$1"
+  if ['$s']=='"Please wait, caching files."' u "Patientez, mise en cache des fichiers."
+#  elif ['$s']=='"- Insert Coin -"' u "- Ins\351rez une pi\350ce -"
+  elif ['$s']=='"Select an image..."' u "S\351lectionnez une image..."
+  elif ['$s']=='"From Camera"' u "\300 partir de la cam\351ra"
+  elif ['$s']=='"Apples"' u "Pommes"
+  elif ['$s']=='"Boat"' u "Bateau"
+  elif ['$s']=='"Bottles"' u "Bouteilles"
+  elif ['$s']=='"Buildings"' u "Immeubles"
+  elif ['$s']=='"Butterfly"' u "Papillon"
+  elif ['$s']=='"Car"' u "Voiture"
+  elif ['$s']=='"Cat"' u "Chat"
+  elif ['$s']=='"Coffee"' u "Caf\351"
+  elif ['$s']=='"Colorful"' u "Portrait color\351"
+  elif ['$s']=='"Eagle"' u "Aigle"
+  elif ['$s']=='"Guitar"' u "Guitare"
+  elif ['$s']=='"Landscape"' u "Paysage"
+  elif ['$s']=='"Man"' u "Homme"
+  elif ['$s']=='"Sheep"' u "Mouton"
+  elif ['$s']=='"Strawberries"' u "Fraises"
+  elif ['$s']=='"Woman"' u "Femme"
+  elif ['$s']=='"Wreck"' u "\311pave"
+  elif ['$s']=='"Choose a style..."' u "Choisissez un style..."
+  elif ['$s']=='"Color Spots"' u "T\342ches de couleurs"
+  elif ['$s']=='"Coral"' u "Corail"
+  elif ['$s']=='"Gray Tree"' u "Arbre argent\351"
+  elif ['$s']=='"Great Wave"' u "La grande vague"
+  elif ['$s']=='"Hatching"' u "Hachures"
+  elif ['$s']=='"Hieroglyphs"' u "Hi\351roglyphes"
+  elif ['$s']=='"Mandelbrot Fractal"' u "Fractale de Mandelbrot"
+  elif ['$s']=='"Metro"' u "M\351tro"
+  elif ['$s']=='"Self-Portrait"' u "Autoportrait"
+  elif ['$s']=='"Shells"' u "Coquillages"
+  elif ['$s']=='"Starry Night"' u "Nuit \351toil\351e"
+  elif ['$s']=='"Wave"' u "Vague"
+  elif ['$s']==['"Woman\47s Head"'] u "Portrait de femme"
+  elif ['$s']=='"Yellow-Red-Blue"' u "Jaune-rouge-bleu"
+  elif ['$s']=='"Image & Style"' u "Image & style"
+  elif ['$s']=='"Result"' u "R\351sultat"
+  elif ['$s']=='"Virtual Artist is painting!\n   ( Scale "'
+    u "L\47Artiste Virtuel est en train de peindre !\n             ( \311chelle "
+  else u $s
+  fi
+
+
+#
+# Definition of surprise animations.
+#
+display_anim :
+  $_background
+  +rs.. {[w,h]/2},1,0
+  frame. {v=max(w,h)*1%;[v,v]},255
+  j.. .,0.5~,{0.5+0.05*sin($|*2)}~ w.. rm[-2,-1]
+
+anim_fire :
+  i[0] 100,32
+  i[1] (0,255,255,255,255^0,0,255,255,255^0,0,0,128,255) r[1] 256,1,1,3,3
+  i[2] (0,0,0;0,0,0;1,1,1;0,1,0) *[2] 0.21
+  text3d "GREYC",33,3,1
+  mv. 3 c3d[3] n3d[3] *3d[3] 320 col3d[3] 255,205,130 db3d 0 f3d 300
+  100,100 rand. 0,255 ellipse. 50%,50%,5,5,0,1,300 b. 10
+  sharpen. 1000 shrink. xy,1 n. 0,255 to_rgb. light3d . rm.
+  time0=$|
+  angle=0
+  do
+    correlate[0] [2]
+    {0,w},1 rand. 128,256 j[0] .,0,{{0,h}-1} rm.
+    +r[0] 400,200,1,1,3 map. [1]
+    +r3d[3] 0,1,0,$angle j3d.. .,50%,50%,0,1,5,0,0
+    *3d. 0.25,0.16,1 j3d[0] .,50%,50%,0,1,3,0,0
+    rm.
+    angle+=3
+    display_anim. rm. wait 40
+  while {*}" && "!{*,ESC}" && "!{*,Q}" && "$|-$time0<12
+
+anim_starfield3d :
+  ({'GREYC'}) s x
+  x=0 N=$! repeat $N 0 t. {$>,t},0,0,48,1,1 x$>=$x y$>=0 z$>={-3200-150*$>} x={$x+w+8} done k[50%--1]
+  expand xy,6,0 dilate_circ 5 b 0.5 expand z,1,0 isosurface3d 10% *3d 1,1,5 rv3d
+  repeat $N col3d[$>] ${-RGB} done
+  0 t. "Since 1995",0,0,48,1,1 rs. ,18 +f. 255 to_rgb.
+  random3d 2500 col3d. 255 *3d. 320,200,1000 -3d. 160,100
+  l3d 0,0,-600
+  t0=0 t=0
+
+  time0=$|
+  do
+    320,200,1,3
+
+    # Starfield.
+    l.. s3d
+      r[2] 3,{2,h/3},1,1,-1 s[2] x %[4] 1000
+      +/[4] 1000 *. -1 n. 0,2 c. 0,1 sqr. j.. . rm.
+      a[2-4] x
+      y a y
+    done
+    j3d. ..,50%,50%,-600,1,0,0,0,240 -3d.. 0,0,{min(12,$t0/10-4)}
+
+    # Torus.
+    torus3d 100,30 col3d. 255,64,255
+    +col3d. 64,64,255 r3d. 1,0,0,-90 +3d. 65,0,0
+    +3d[-2,-1] c3d.
+    r3d. 1,1,0,{-6*$t} r3d. 0,0,1,{2*$t}
+    j3d.. .,{($t-200)*2}%,50%,0,0.25,3,0,0 rm.
+
+    # Letters.
+    repeat $N
+      +r3d[$>] 1,{$>%4},1,{-${z$>}/2}
+      j3d.. .,{75+${x$>}},{60+${y$>}},${z$>},1,4,0,0 rm.
+      z$>={tl=280+6*$<;if($t<tl,min(0,${z$>}+20),-20*($t-tl))}
+    done
+
+    # Presents.
+    if $t<280 op={max(0,min(1,($t-200)/20))}
+    else op={max(0,1-($t-280)/20)}
+    fi
+    j. ...,{(w-{-3,w})/2},120,0,0,$op,[-4]
+
+    display_anim. rm. wait 30
+    t0+=1 t={$t0%350}
+    if !$t x=0 repeat 5 z$>={-3200-150*$>} done fi
+  while {*}" && "!{*,ESC}" && "!{*,Q}" && "$|-$time0<12
+
+anim_waves :
+  if !$! l[] # Generate fractal image
+    200,200 x={-1.06-u*0.1} y={-0.26-u*0.1}
+    mandelbrot $x,$y,{$x+0.1},{$y+0.1},256
+    16,1,1,3,u r. 256,1,1,3,3 shift. 1
+    map[0] . rm. rs 100
+    +mirror y +mirror x + n 0,128
+    shape_fern {2*w},70%,25 rs. {-2,3*w/4} to_rgb. ri. ..,0,0,0.5,0.5 n. 0,196 +[-2,-1] c. 0,255
+  done else k[0] r[0] 100,100,1,3,2 fi
+  i[0] (20;80;0^20;80;0^20;80;0) r[0] 400,300,1,3,3 water[0] 100,2
+  w={w} elevation3d. 0 rv3d.
+  sh. 8,{7+3*i[6]},0,0 r. 3,{h/3},1,1,-1
+  (0,1,0;1,0,1;0,1,0) /. 2
+  ball[] 20,200,255,128,1,0.7,3.5
+
+  0 $w,$w .
+  l3d {$w/2},-200,-1000 sl3d 0.4 ss3d 0.8 f3d 500 time0,_time0=$|
+  do
+    +convolve. [3],1 -. ... rm... b. 0.8 -. {ia} # Update height map.
+    r. 1,{$w*$w},1,1,-1 j[2] .,2,0 r. $w,$w,1,1,-1 # Set 3D object coordinates.
+    [1]
+    if {5,h} +l[5] rows 0,2
+      nb={w}
+      i[0] ({'CImg3d'}) i[1] ($nb,$nb) transpose[2]
+      (1,0;1,{$nb-1}) r. 2,$nb,1,1,3 round.
+      1,{4*$nb},1,1,1 y a y
+    done [4] sprites3d.. .,1 rm. +3d[-2,-1] fi
+    -3d. {$w/2},{$w/2} *3d. {0,0.9*max(w,h)/$w} # Center and scale 3D object.
+    r3d. 0,0,1,{$|*30} r3d. 1,0,0,120 # Get rotated 3D object.
+    +j3d[0] .,50%,65%,30,1,3,0,0
+    display_anim. rm[-2,-1] wait 20
+    if ($|-$_time0)>0.4 ({u*$w};{u*$w};70;0) a[5,-1] x _time0={$|-u} fi # Insert new ball.
+    if {5,h} l[5,-1] # Manage ball motion and collision.
+      sh[0] 2,2,0,0 sh[0] 3,3,0,0 -.. . +. 0.2 rm[-2,-1]
+      s[0] x repeat $!-1 coords={$<,@0-1} if {$<,@2}<i($coords) =. {80+{i($coords)}},$coords rm[$<] fi done
+      if $!==1 i[0] 0 else a[0--2] x fi
+      done
+    fi
+  while {*}" && "!{*,ESC}" && "!{*,Q}" && "$|-$time0<12
+
+anim_light :
+  # Create warping and color images.
+  0 t. "GREYC\nRocks!",0,0,80,1,255 expand. xy,15,0 b. 3
+  . n.. 0,1 r.. 100%,100%,1,3
+  sh.. 0 *. 120 rm.
+  sh.. 1 *. 70 rm.
+  sh.. 0,50%,0,2 *. 120 rm.
+  25%,25%,1,1 rand. -20,20 smooth. 10,0,1,1,4 ri. ..,3 b. 3 n. -100,100
+  +[-2,-1] g. xy a[-2,-1] c n. -150,150
+
+  # Create a large light image.
+  light=70
+  640,640 gaussian. $light n. 0,255
+  t=0
+
+  time0=$|
+  # Start animation.
+  do
+    X={round((w-{-2,w}*(1+cos(2*$t)))/2)}
+    Y={round((h-{-2,h}*(1+sin(2.5*$t)))/2)}
+    t+=0.02
+    +z. $X,$Y,{$X+{-2,w}-1},{$Y+{-2,h}-1}
+    warp. ...,1,0,1
+    r. 100%,100%,1,3 +. [-4] c. 0,255
+    display_anim. rm. wait 20
+  while {*}" && "!{*,ESC}" && "!{*,Q}" && "$|-$time0<12
+
+
+anim_metaballs3d :
+  100,100 noise. 100,1 plasma. 1,0,10 r. 512,320,1,3 n. 0,1 b. 4,0 n. 0,255
+  mix_channels. (0.7,0,0;0,0.9,0;0,0,1.2) c. 0,255 l3d
+  24,24,24,1,'X=x-w/2;Y=y-h/2;Z=z-d/2;exp(-(X*X+Y*Y+Z*Z)/100)'
+  72,72,72 M=8 mode=5
+  repeat $M fx$>={2*g} fy$>={2*g} fz$>={2*g} done
+  time0=$|
+  do
+    repeat $M
+      x$>={w/2+0.5*(w-{1,w}-4)*cos(${fx$>}*$|)}
+      y$>={h/2+0.5*(h-{1,h}-4)*sin(${fy$>}*$|)}
+      z$>={d/2+0.5*(d-{1,d}-4)*sin(${fz$>}*$|)}
+    done
+    f[2] 0 repeat $M j[2] [1],{${x$>}-{1,w/2}},{${y$>}-{1,h/2}},{${z$>}-{1,d/2}},0,-1 done
+    +r[2] 28,28,28,1,2 isosurface3d. 0.4 -3d. 12,12,12 *3d. 13 rv3d.
+    r3d. 1,2,1,{100*$|}
+    N={i[7]} (255,255,150;200,96,164;50,150,230) r. 3,$N,1,1,3 y. j.. .,0,{{-2,h}-4*$N} # Do some color tweaks.
+    if !$mode circles3d.. 4 fi
+    +j3d[0] ..,50%,50%,0,1,{if(!$mode,3,$mode)},0,0,300,0,0,-500,0.1,1.5
+    display_anim. rm[-3--1] wait 20
+
+  while {*}" && "!{*,ESC}" && "!{*,Q}" && "$|-$time0<12
+
+
+anim_reflection3d :
+
+  # Render background.
+  128,256,1,3 rand. 0,255 plasma. 1,100 blur_xy. 30,2
+  sh. 0 n. 0,90 rm. sh. 1 n. 0,60 rm. sh. 2 n. 0,180 rm.
+  +mirror. x [-2,-1] a[-4--1] x
+  +luminance. mirror. x b. 2 n. 0,255
+
+  # Create 3D objects.
+  torus3d 30,10 col3d. 255,200,0
+  spherical3d "80+20*abs(cos(2*theta))",47,34 s3d. rm.. i.. 3,{h},1,1,150,220,255,200,255,255 y.. a[-6--1] y
+  spherical3d "100*abs(1+0.6*cos(3*phi)*sin(4*theta))",47,34
+  r3d[-2,-1] 0,1,0,90 db3d 0
+
+  # Start animation loop.
+  xb,xl,anim=0
+  time0=$|
+  do
+
+    tic=$|
+    # Recreate 3D interpolated background object.
+    +rows. 8,{8+3*i[6]-1} +j... .,0,8,0,0,{if($anim<250,0,0.5-0.5*cos(($anim-250)/100))} rm..
+
+    # Render 3D background object (with flat colors).
+    +z[-6] $xb,0,{$xb+255},255 j3d. ..,75%,50%,0,1,3,0,0
+
+    # Render light reflection map.
+    +z[-6] $xl,0,{$xl+255},255
+    xf={min(30,$anim-70)+20*cos(1.8*$|)}
+    yf={50+20*sin(2.7*$|)}
+    j3d. [-6],{20+$xf}%,$yf%,0,1,4,0,0
+
+    # Add light reflection to 3D background object.
+    l3d . rm. +j3d. ..,75%,50%,0,1,5,0,0 j.. .,0,0,0,0,0.6 rm[-3,-1]
+
+    # Add 3D foreground object.
+    j3d. [-4],$xf%,$yf%,0,1,4,0,0
+
+    display_anim. rm.
+
+    xb={($xb+6)&255}
+    xl={($xl-6)&255}
+    anim+=1
+    r3d[-2,-1] {sin(0.5*$|)},{cos($|)},1,{max(0.005,$|-$tic)*33}
+    r3d... -1,0.3,0.8,{max(0.005,$|-$tic)*100}
+    wait 20
+  while {*}" && "!{*,ESC}" && "!{*,Q}" && "$|-$time0<12
+
+anim_rubber3d :
+  sphere3d 150,0 torus3d 70,15 cylinder3d 20,40
+  col3d... 200,200,200,0.3 col3d.. 128,200,76 col3d. 200,128,76
+  c3d[-3--1] r3d. 1,0,0,70 +3d[-3--1] +3d. 10,-8,20 *3d. 1.5
+  400,400,64,3
+  {w},{h},1,3,'if(c==0,x,if(c==1,y,y*{1,d}/h))'
+  {w},{h},1,3
+  frame=0
+  time0=$|
+  do
+    {w},{h},1,3 fc. 16,32,32 j3d. [0],50%,50%,0,1,3,0,0 j[1] .,0,0,$frame rm.
+    r3d[0] 0.1,1,0.6,{3*cos($|*1.25)} r3d[0] 1,0.2,0.6,-1
+    +warp[1] [2],0,0 *[3] 0.8 *. 0.2 +[3] . rm.
+    display_anim. wait[0] 20
+    sh[2] 2 -. 1 &. {{1,d}-1} rm.
+    frame={($frame-1)%{1,d}}
+  while {*}" && "!{*,ESC}" && "!{*,Q}" && "$|-$time0<12
+
+
+anim_bouncing :
+  520,320,1,3 plasma 1,1,9 n 0,220
+  N=12
+  repeat $N
+    ball[] {round(u(32,80))},${-RGB}
+    t$>={u(200)} x$>={0,u(10,w-10)} h$>={u(150,300)} vx$>={if(u<0.5,1,-1)*u(1,8)}
+  done
+  mv[0] $!
+  (0;0.7;1) r. {-2,w},70,1,1,3
+
+  time0=$|
+  do
+    [$N]
+    repeat $N
+      bw={$>,w} bh={$>,h}
+      y={${h$>}*abs(cos(${t$>}*pi/60))-$bh/2}
+      dt=1
+      if $y<0 d={-$y} y=0 bh-=$d bw+=$d dt={max(0.2,1-($d/$bh)^2)} else dt=1 fi
+      if ${x$>}+$bw/2>w
+        d={${x$>}+$bw/2-w} bw-=$d bh+={0.5*$d}
+        if ${x$>}+$bw/4>w vx$>={-${vx$>}} fi
+      fi
+      if ${x$>}-$bw/2<0
+        d={$bw/2-${x$>}} bw-=$d bh+={0.5*$d}
+        if ${x$>}-$bw/4<0 vx$>={-${vx$>}} fi
+      fi
+      +r[$>] $bw,$bh,1,4,3 s. c,-3
+      j... ..,{max(0,min({$N,w-$bw},${x$>}-$bw/2))},{{$N,h}-{h}-$y-70},0,0,1,.,255 rm[-2,-1]
+      t$>+=$dt
+      x$>+={$dt*${vx$>}}
+    done
+
+    +rows. {h-2*70},{h-1-70} mirror. y *. [{$N+1}]
+    j.. .,0,{-2,h-71},0,0,0.5 rm.
+
+    display_anim. wait 20
+  while {*}" && "!{*,ESC}" && "!{*,Q}" && "$|-$time0<12
+
+anim_fireworks :
+  (16;64^64;32^128;32) r 320,160,1,3,3             # [-2] = Background (color gradient).
+  .                                                 # [-1] = Rendered image.
+  time=0
+  time0=$|
+  do                                               # Start animation loop.
+    time-=1
+    if $!==2\ ||\ $time<0   # Insert new rocket.
+      i[0] ({u(w)},\        # X-position
+            {h},\           # Y-position
+            {u(-3,3)},\     # X-velocity
+            {u(2)-5},\      # Y-velocity
+            {30+u(20)},\    # Time of explosion
+            1.5,\           # Radius
+            255,255,255)    # Color
+      time={u(20)}          # Elapsed time until next rocket.
+    fi
+    *. 0.99                 # Create fading effect with previous frames.
+    j. ..,0,0,0,0,0.2       # Add background.
+    i=0
+    repeat $!-2
+      to_be_removed=0
+      radius={if({$i,@4}>0,{$i,@5}/3,{$i,@5}*(1+2*({$i,@4}+2)/120))}
+      ellipse. {$i,@0},{$i,@1},{$i,@5},{max(1,$radius)},{atan2({$i,@3},{$i,@2})*180/pi},0.6,{$i,@6-8}  # Draw rocket.
+      ({$i,@2},{$i,@3},0,0.09,-1,0,0,0,0) +[$i,-1] # Compute new position of the rocket.
+      if {$i,@0}<0\ ||\ {$i,@0}>=w\ ||\ {$i,@1}>=h\ ||\ $radius<0 to_be_removed=1 fi # Discard if rocket disappear.
+      if {$i,@4}<0\ &&\ {$i,@4}>=-1 # In case of explosion -> Split current rocket into several colorful rockets.
+        color={min(255,80+u(200))},{min(255,80+u(200))},{min(255,80+u(200))}
+        radius={u(10)}
+        N={5+u(10)}
+        repeat $N
+          angle={$>*2*pi/$N}
+          i... ({$i,@0,1},{2*cos($angle)+{$i,@2}/1.5},{2*sin($angle)+{$i,@3}/1.5},-2,$radius,$color)
+        done
+        to_be_removed=1
+      fi
+      if $to_be_removed rm[$i] else i+=1 fi  # If processed rocket has to be removed.
+    done
+    display_anim. wait 20  # Display rendered frame.
+  while {*}" && "!{*,ESC}" && "!{*,Q}" && "$|-$time0<12
+
+
+# Local Variables:
+# mode: sh
+# End:
+#
+# (End of G'MIC custom commands)
