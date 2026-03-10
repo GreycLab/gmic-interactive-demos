@@ -1,0 +1,47 @@
+#!/usr/bin/gmic
+
+v + moire
+
+# Generate books for 'Moiré Animations'.
+#---------------------------------------
+moire :
+  e "\n- Generate moire animations.\n"
+
+  # Prepare directory structure.
+  delete pdf,png
+  createdir pdf,png
+
+  # Convert .gif to still images + masks.
+  files gif/*.gif
+  files=${}
+  repeat narg($files) {
+    file=${"arg0 "$>,$files}
+    e "   > Processing '"$file"'."
+
+    0 nm. $file bs={b} rm
+    outfile_png=png/anim_$bs.png
+    outfile_pdf=pdf/anim_$bs.pdf
+
+    if !isfile(['{/$outfile_png}'])" || "!isfile(['{/$outfile_pdf}'])
+      i $file
+      fx_moire 1,0,2,1,1,2,1,5 N=${}
+      outmask_png=png/mask_$N.png
+      outmask_pdf=pdf/mask_$N.pdf
+      nm $outfile_png,$outmask_png
+      ow
+      x "magick convert -density 300 "$outfile_png" "$outfile_pdf
+      if !isfile('{/$outmask_pdf}')
+        x "magick convert -density 300 "$outmask_png" "$outmask_pdf
+      fi
+    fi
+
+  }
+  rm
+
+  # Merge all results as printable .pdf files.
+  x "pdftk pdf/mask_*.pdf cat output all_masks.pdf"
+  x "pdftk pdf/anim_*.pdf cat output all_anims.pdf"
+  e "\n- Done!\n"
+
+
+# (End of G'MIC custom commands)

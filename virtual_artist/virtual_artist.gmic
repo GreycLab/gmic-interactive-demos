@@ -998,9 +998,4 @@ anim_fireworks :
     display_anim. wait 20  # Display rendered frame.
   while {*}" && "!{*,ESC}" && "!{*,Q}" && "$|-$time0<12
 
-
-# Local Variables:
-# mode: sh
-# End:
-#
 # (End of G'MIC custom commands)

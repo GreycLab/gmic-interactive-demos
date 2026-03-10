@@ -471,10 +471,4 @@ gw_joke :
   "Allez c'est bon, enl\350ve ton masque !"
   narg $jokes arg0 int(u(${}+1))%${},$jokes
 
-
-
-# Local Variables:
-# mode: sh
-# End:
-#
 # (End of G'MIC custom commands)

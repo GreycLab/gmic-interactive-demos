@@ -26,6 +26,8 @@ gmic-interactive-demos/
 
 ├── greyc_warp/             # Interactive warping of images from the webcam (deforming mirror)
 
+├── moire/                  # Moire patterns for creating animations from still images
+
 ├── LICENSE                 # Description of the CeCILL Free Software License Agreement
 
 └── README.md               # This file
