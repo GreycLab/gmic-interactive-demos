@@ -34,7 +34,6 @@ moire :
         x "convert -density 300 "$outmask_png" "$outmask_pdf" >/dev/null 2>&1"
       fi
     fi
-
   }
   rm
 
