@@ -29,9 +29,9 @@ moire :
       outmask_pdf=pdf/mask_$N.pdf
       nm $outfile_png,$outmask_png
       ow
-      x "magick convert -density 300 "$outfile_png" "$outfile_pdf
+      x "convert -density 300 "$outfile_png" "$outfile_pdf" >/dev/null 2>&1"
       if !isfile('{/$outmask_pdf}')
-        x "magick convert -density 300 "$outmask_png" "$outmask_pdf
+        x "convert -density 300 "$outmask_png" "$outmask_pdf" >/dev/null 2>&1"
       fi
     fi
 
