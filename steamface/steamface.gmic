@@ -229,7 +229,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 
   # Initialize webcam.
   camera $camera_index,1,0,640,480 rm.
-  zoom=0.75
+  zoom=0.5
 
   # Start user interaction loop.
   w[background] $window_width,$window_height,0,$is_fullscreen,"Steam Face"
@@ -350,7 +350,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
         +r[camera] {camera,s=cut($zoom+0.1,0,1)*min(w,h);[s,s]},1,100%,0,0,0.5,0.5
         o. snapshots/{`string(v2s(date(0),-4,4),v2s(date(1),-2,2),v2s(date(2),-2,2),\
                               v2s(date(4),-2,2),v2s(date(5),-2,2),v2s(date(6),-2,2))`}.jpg,85
-        rs. 128 w2. 400,400
+        rs. 128
         eval ${-nn_lib}"IN = crop(#-1)/255;"${_celeba_forward}"store('celeba_OUT',100*sigmoid(celeba_OUT))"
         rm. $celeba_OUT => face_attributes
       fi
