@@ -253,7 +253,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 
       # Get face detector output.
       if !($>%8)
-        +r[camera] {camera,s=$face_area_factor*min(w,h);[s,s]},1,100%,0,0,0.5,0.5
+        +r[camera] {camera,s=$face_area_factor*0.85*min(w,h);[s,s]},1,100%,0,0,0.5,0.5
         rs. 54 norm.
         face_detector:=${-nn_lib}"
           IN = crop(#-1);"\
@@ -354,7 +354,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
       # Estimate face attributes.
       if !narg($face_attributes)
         if !isdir('snapshots') createdir snapshots fi
-        +r[camera] {camera,s=cut(1.5*$face_area_factor,0,1)*min(w,h);[s,s]},1,100%,0,0,0.5,0.5
+        +r[camera] {camera,s=cut($face_area_factor,0,1)*min(w,h);[s,s]},1,100%,0,0,0.5,0.5
         o. snapshots/{`string(v2s(date(0),-4,4),v2s(date(1),-2,2),v2s(date(2),-2,2),\
                               v2s(date(4),-2,2),v2s(date(5),-2,2),v2s(date(6),-2,2))`}.jpg,85
         rs. 128
