@@ -203,20 +203,9 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
   data/icon_auto.png => icon_auto
   data/steam_seq.gmz => steam_seq
   data/mask.png rs. $window_width,$window_height,1,3
-  eval. ">begin(
-      x1m = y1m = x2m = y2m = x3m = y3m = x4m = y4m = inf;
-      x1M = y1M = x2M = y2M = x3M = y3M = x4M = y4M = -inf;
-    );
-    i==1?(x1m = min(x,x1m); y1m = min(y,y1m); x1M = max(x,x1M); y1M = max(y,y1M));
-    i==2?(x2m = min(x,x2m); y2m = min(y,y2m); x2M = max(x,x2M); y2M = max(y,y2M)):
-    i==3?(x3m = min(x,x3m); y3m = min(y,y3m); x3M = max(x,x3M); y3M = max(y,y3M)):
-    i==4?(x4m = min(x,x4m); y4m = min(y,y4m); x4M = max(x,x4M); y4M = max(y,y4M));
-    end(
-      run('x1m,y1m,x1M,y1M=',x1m,',',y1m,',',x1M,',',y1M);
-      run('x2m,y2m,x2M,y2M=',x2m,',',y2m,',',x2M,',',y2M);
-      run('x3m,y3m,x3M,y3M=',x3m,',',y3m,',',x3M,',',y3M);
-      run('x4m,y4m,x4M,y4M=',x4m,',',y4m,',',x4M,',',y4M);
-    )"
+  eval. ">begin(xm = ym = vector4(inf); xM = yM = vector4(-inf));
+    i?(i1 = i-1; xm[i1] = min(x,xm[i1]); ym[i1] = min(y,ym[i1]); xM[i1] = max(x,xM[i1]); yM[i1] = max(y,yM[i1]));
+    end(repeat (4,k, k1 = 1 + k; run('x',k1,'m,y',k1,'m,x',k1,'M,y',k1,'M=',xm[k],',',ym[k],',',xM[k],',',yM[k])))"
   +z. $x2m,$y2m,$x2M,$y2M z.. $x1m,$y1m,$x1M,$y1M neq[-2,-1] 0 => mask1,mask2
   rs[light_red,light_green] {mask1,max(1,round(w/5))}
   rs[icon_auto] ,{background,max(1,round(h/16))}
@@ -238,12 +227,13 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
   nn_load data/face_analysis.gmz
 
   # Initialize webcam.
-  camera $camera_index,1,0,640,480 rm.
-  zoom=0.5
+  camera $camera_index,1,0,640,480
+  rm.
 
   # Start user interaction loop.
   w[background] $window_width,$window_height,0,$is_fullscreen,"Steam Face"
   is_automode=1
+  zoom=0.5
 
   repeat inf {
 
@@ -260,7 +250,11 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 
       # Get face detector output.
       if !($>%8)
-        +r[camera] {camera,s=$zoom*min(w,h);[s,s]},1,100%,0,0,0.5,0.5 rs. 54 norm.
+        +r[camera] {camera,s=$zoom*min(w,h);[s,s]},1,100%,0,0,0.5,0.5
+
+#        w2.
+
+        rs. 54 norm.
         face_detector:=${-nn_lib}"
           IN = crop(#-1);"\
           ${_faceds_forward}"
