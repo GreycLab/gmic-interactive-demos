@@ -175,10 +175,17 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
   e " - Start 'The SteamFace Machine' in "$s$1" mode, using camera \#$2.\n
 ------ "${g}"The SteamFace Machine"$n" -----------------------------------\n
 ----\n
----- Key '"${c}"A"$n"' enables/disables automatic mode.\n
----- Key '"${c}"BACKSPACE"$n"' takes new snapshot on face attributes page.\n
----- Keys '"${c}"SPACE"$n"' or '"${c}"ENTER"$n"' to go to next page.\n
----- Keys '"${c}"ESC"$n"' or '"${c}"Q"$n"' to exit.\n
+---- "${g}"Enable/Disable Auto-Mode:"$n"\n
+---- > Key '"${c}"A"$n"' or click at the bottom left of the screen.\n
+----\n
+---- "${g}"Re-Run Analysis on Face Attributes Page:"$n"\n
+---- > Key '"${c}"BACKSPACE"$n"' or click on the camera view.\n
+----\n
+---- "${g}"Go to Next Page:"$n"\n
+---- > Keys '"${c}"SPACE"$n"' or '"${c}"ENTER"$n"', or click anywhere.\n
+----\n
+---- "${g}"Exit:"$n"\n
+---- > Keys '"${c}"ESC"$n"' or '"${c}"Q"$n"'.\n
 ----\n
 ----------------------------------------------------------------\n"
 
@@ -257,7 +264,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
         rm.
       fi
       momented_face_detector:=lerp($face_detector,$momented_face_detector,0.85)
-      is_face_detected:=$momented_face_detector>=92
+      is_face_detected:=$momented_face_detector>=85
       if $is_face_detected
         if $timer_face<0 timer_face=$| fi
       else timer_face=-1
@@ -302,13 +309,16 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
         timer_countdown=inf
       fi
 
-      # Manage automatic mode.
+      # Draw automode icon.
       if $is_automode" && "$|%2<1 ja[canvas] [icon_auto],0.01~,0.99~,0,0,0.75 fi
-      if {*,-A} is_automode:=!$is_automode timer_face=-1 fi
 
       # Display frame and wait for event.
       w[canvas] wait 20
       rm[canvas,camera,camera_view]
+
+      if {background,{*,-A}" || "({*,b}" && "inrange({*,x},0,w#$icon_auto)" && "inrange({*,y},h-h#$icon_auto,h))}
+        is_automode:=!$is_automode timer_face=-1 wait -1
+      fi
 
       if $is_face_detected" && "({*,RETURN}" || "{*,SPACE}" || "{*,b}" || "{*,k}==65366)
         timer_face:=$|-3
@@ -394,19 +404,25 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
       # Draw animated steam cloud.
       sf_steamcloud
 
-      # Manage automatic mode.
+      # Draw automode icon.
       if $is_automode" && "$|%2<1 ja[canvas] [icon_auto],0.01~,0.99~,0,0,0.75 fi
-      if {*,-A} is_automode:=!$is_automode fi
 
       # Display frame and wait for event.
       if $flash_opacity j[canvas] [background_white],0,0,0,0,$flash_opacity fi
       w[canvas] wait 20
       rm[canvas,camera,camera_view]
 
+      if {background,{*,-A}" || "({*,b}" && "inrange({*,x},0,w#$icon_auto)" && "inrange({*,y},h-h#$icon_auto,h))}
+        is_automode:=!$is_automode timer_face=-1 wait -1
+      fi
+      if {*,k}==65365" || "{*,BACKSPACE}" || "({*,b}" && "{mask1,i([{*,x,y}]-[$x1m,$y1m])})
+        rmn face_attributes wait -1
+      fi
+
       is_quit:=!{*}" || "{*,ESC}" || "{*,Q}
       go_next_step:={*,RETURN}" || "{*,SPACE}" || "{*,b}" || "{*,k}==65366" || "\
                     ($is_automode" && "$|>$timer_attributes+20)
-      if {*,k}==65365" || "{*,BACKSPACE} rmn face_attributes fi
+
     while !($is_quit" || "$go_next_step)
     if $is_quit break fi
     rm[momented_face_attributes,face_attributes]
