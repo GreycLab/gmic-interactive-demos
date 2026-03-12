@@ -229,7 +229,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 
   # Initialize webcam.
   camera $camera_index,1,0,640,480 rm.
-  x1s,y1s,x1e,y1e={mask1,"M = max(w,h)/2; [ x0 = $x1m + (w - M)/2, y0 = $y1m + (h - M)/2, x0 + M - 1, y0 + M - 1 ]"}
+  zoom=0.75
 
   # Start user interaction loop.
   w[background] $window_width,$window_height,0,$is_fullscreen,"Steam Face"
@@ -252,7 +252,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 
       # Get face detector output.
       if !($>%8)
-        +r[camera] {camera,s=max(w,h)*50%;[s,s]},1,100%,0,0,0.5,0.5 rs. 54 norm.
+        +r[camera] {camera,s=$zoom*min(w,h);[s,s]},1,100%,0,0,0.5,0.5 rs. 54 norm.
         face_detector:=${-nn_lib}"
           IN = crop(#-1);"\
           ${_faceds_forward}"
@@ -274,6 +274,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 
       # Draw camera view.
       j[canvas] [camera_view],$x1m,$y1m,0,0,1,[mask1]
+      x1s,y1s,x1e,y1e={mask1,"M = $zoom*min(w,h); [ x0 = $x1m + (w - M)/2, y0 = $y1m + (h - M)/2, x0 + M - 1, y0 + M - 1 ]"}
       rectangle[canvas] $x1s,$y1s,$x1e,$y1e,0.75,0xF0F0F0F0,255
 
       # Draw some layer outputs of face detector network.
@@ -321,7 +322,9 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
       if {background,{*,-A}" || "({*,b}" && "inrange({*,x},0,w#$icon_auto)" && "inrange({*,y},h-h#$icon_auto,h))}
         is_automode:=!$is_automode timer_face=-1 wait -1
       fi
-
+      if {*,ARROWUP}" || "{*,ARROWRIGHT} zoom:=cut($zoom+0.1,0.25,1)
+      elif {*,ARROWDOWN}" || "{*,ARROWLEFT} zoom:=cut($zoom-0.1,0.25,1)
+      fi
       if $is_face_detected" && "({*,RETURN}" || "{*,SPACE}" || "{*,b}" || "{*,k}==65366)
         timer_face:=$|-3
         timer_countdown=0
@@ -349,7 +352,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
         o[camera] snapshots/{`string(v2s(date(0),-4,4),v2s(date(1),-2,2),v2s(date(2),-2,2),\
                                      v2s(date(4),-2,2),v2s(date(5),-2,2),v2s(date(6),-2,2))`}.jpg,85
 
-        +r[camera] {camera,s=max(w,h)*50%;[s,s]},1,100%,0,0,0.5,0.5 rs. 128 # w2. 400,400
+        +r[camera] {camera,s=$zoom*min(w,h);[s,s]},1,100%,0,0,0.5,0.5 rs. 128 # w2. 400,400
         eval ${-nn_lib}"IN = crop(#-1)/255;"${_celeba_forward}"store('celeba_OUT',100*sigmoid(celeba_OUT))"
         rm. $celeba_OUT => face_attributes
       fi
@@ -357,6 +360,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 
       # Draw camera view.
       j[canvas] [camera_view],$x1m,$y1m,0,0,1,[mask1]
+      x1s,y1s,x1e,y1e={mask1,"M = $zoom*min(w,h); [ x0 = $x1m + (w - M)/2, y0 = $y1m + (h - M)/2, x0 + M - 1, y0 + M - 1 ]"}
       rectangle[canvas] $x1s,$y1s,$x1e,$y1e,0.75,0xF0F0F0F0,255
 
       # Draw dials for face attributes.
@@ -416,6 +420,9 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 
       if {background,{*,-A}" || "({*,b}" && "inrange({*,x},0,w#$icon_auto)" && "inrange({*,y},h-h#$icon_auto,h))}
         is_automode:=!$is_automode timer_face=-1 wait -1
+      fi
+      if {*,ARROWUP}" || "{*,ARROWRIGHT} zoom:=cut($zoom+0.1,0.25,1)
+      elif {*,ARROWDOWN}" || "{*,ARROWLEFT} zoom:=cut($zoom-0.1,0.25,1)
       fi
       if {*,k}==65365" || "{*,BACKSPACE}" || "({*,b}" && "{mask1,i([{*,x,y}]-[$x1m,$y1m])})
         rmn face_attributes wait -1
