@@ -139,8 +139,8 @@ sf_frame :
 #@cli : Capture camera frame, normalize it and generate camera view (old-style image).
 #@cli : Returns two images named [camera] (size:640x480) and [camera_view] (size: adaptive).
 +sf_camera : check "isint(${1=0},0)"
-  camera $1,1,0,640,480 mirror. x => camera
-  +rs[camera] {mask1,[w,h]},3,3 f. ">cut(128 + 50*(i - ia)/id,0,255)"
+  camera $1,1,0,640,480 r. {[w,round(w*h#$mask1/w#$mask1)]},1,100%,0,0,0.5,0.5 mirror. x => camera
+  +rs[camera] {mask1,w} f. ">cut(128 + 50*(i - ia)/id,0,255)"
   +channels. 1 map. [sepia] j.. .,0,0,0,0,0.75 rm.
   sh[vignette_warp] 100% f. {(d#$vignette-1)*(1+wave($>/300))/2} rm.
   +warp[vignette] [vignette_warp],0,1 *[-2,-1] c. 0,255 => camera_view
