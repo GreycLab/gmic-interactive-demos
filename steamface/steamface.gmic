@@ -432,8 +432,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 
     while !($is_quit" || "$go_next_step)
     if $is_quit break fi
-    rm[momented_face_attributes,face_attributes]
-    rmn camera,camera_view
+    rmn momented_face_attributes,face_attributes
   }
   rm
 
