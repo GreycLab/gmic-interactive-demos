@@ -282,7 +282,8 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 
       # Draw camera view.
       j[canvas] [camera_view],$x1m,$y1m,0,0,1,[mask1]
-      x1s,y1s,x1e,y1e={mask1,"M = $zoom*min(w,h); [ x0 = $x1m + (w - M)/2, y0 = $y1m + (h - M)/2, x0 + M - 1, y0 + M - 1 ]"}
+      x1s,y1s,x1e,y1e={mask1,"M = $zoom*min(w,h);
+        [ x0 = $x1m + (w - M)/2, y0 = $y1m + (h - M)/2, x0 + M - 1, y0 + M - 1 ]"}
       rectangle[canvas] $x1s,$y1s,$x1e,$y1e,0.75,0xF0F0F0F0,255
 
       # Draw some layer outputs of face detector network.
@@ -370,7 +371,8 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 
       # Draw camera view.
       j[canvas] [camera_view],$x1m,$y1m,0,0,1,[mask1]
-      x1s,y1s,x1e,y1e={mask1,"M = $zoom*min(w,h); [ x0 = $x1m + (w - M)/2, y0 = $y1m + (h - M)/2, x0 + M - 1, y0 + M - 1 ]"}
+      x1s,y1s,x1e,y1e={mask1,"M = $zoom*min(w,h);
+        [ x0 = $x1m + (w - M)/2, y0 = $y1m + (h - M)/2, x0 + M - 1, y0 + M - 1 ]"}
       rectangle[canvas] $x1s,$y1s,$x1e,$y1e,0.75,0xF0F0F0F0,255
 
       # Draw dials for face attributes.
