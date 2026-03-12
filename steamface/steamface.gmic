@@ -178,6 +178,9 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 ---- "${g}"Enable/Disable Auto-Mode:"$n"\n
 ---- > Key '"${c}"A"$n"' or click at the bottom left of the screen.\n
 ----\n
+---- "${g}"Increase/Decrease Face Detection Area:"$n"\n
+---- > Arrow Keys or +/- buttons on the screen.\n
+----\n
 ---- "${g}"Re-Run Analysis on Face Attributes Page:"$n"\n
 ---- > Key '"${c}"BACKSPACE"$n"' or click on the camera view.\n
 ----\n
@@ -233,7 +236,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
   # Start user interaction loop.
   w[background] $window_width,$window_height,0,$is_fullscreen,"Steam Face"
   is_automode=1
-  zoom=0.5
+  face_area_factor=0.5
 
   repeat inf {
 
@@ -250,10 +253,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 
       # Get face detector output.
       if !($>%8)
-        +r[camera] {camera,s=$zoom*min(w,h);[s,s]},1,100%,0,0,0.5,0.5
-
-#        w2.
-
+        +r[camera] {camera,s=$face_area_factor*min(w,h);[s,s]},1,100%,0,0,0.5,0.5
         rs. 54 norm.
         face_detector:=${-nn_lib}"
           IN = crop(#-1);"\
@@ -276,23 +276,23 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 
       # Draw camera view.
       j[canvas] [camera_view],$x1m,$y1m,0,0,1,[mask1]
-      x1s,y1s,x1e,y1e={mask1,"M = $zoom*min(w,h);
+      x1s,y1s,x1e,y1e={mask1,"M = $face_area_factor*min(w,h);
         [ x0 = $x1m + (w - M)/2, y0 = $y1m + (h - M)/2, x0 + M - 1, y0 + M - 1 ]"}
       rectangle[canvas] $x1s,$y1s,$x1e,$y1e,0.75,0xF0F0F0F0,255
 
       # Draw some layer outputs of face detector network.
-      siz={mask2,round(max(1,0.22*w))}
+      siz={mask2,round(max(1,0.2*w))}
       l[] {
         ${face0} ${face1} ${face2} ${face3} ${face4} ${face5}
         channels 0,2 rs $siz n 0,255 sf_frame
         a[-3--1] x a[-4--2] x a y
       }
-      ja[canvas] .,{round([$x2m,$y2m]+[0.5*(w#$mask2-w),0.98*(h#$mask2-h)])} rm.
+      ja[canvas] .,{round([$x2m,$y2m]+[0.5*(w#$mask2-w),0.9*(h#$mask2-h)])} rm.
 
       # Draw face detector dial.
       siz={mask2,round(max(1,0.7*w))}
       +sf_dial "Face",$momented_face_detector,$siz
-      x,y:=round([$x2m,$y2m]+[0.5*(w#$mask2-w),0.02*(h#$mask2-h)])
+      x,y:=round([$x2m,$y2m]+[0.35*(w#$mask2-w),0.02*(h#$mask2-h)])
       ja[canvas] .,$x,$y,0,0,0.7 rm.
       if $is_face_detected light_color=green else light_color=red fi
       ja[canvas] [light_$light_color],{$x2m+w#$mask2-w#$light_red-10},$y
@@ -326,9 +326,9 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
         is_automode:=!$is_automode timer_face=-1 wait -1
       fi
       if {*,ARROWUP}" || "{*,ARROWRIGHT}" || "({*,b}" && "inrange({*,x},$x3m,$x3M)" && "inrange({*,y},$y3m,$y3M))
-        zoom:=cut($zoom+0.1,0.25,1) wait -1
+        face_area_factor:=cut($face_area_factor+0.1,0.25,1) wait -1
       elif {*,ARROWDOWN}" || "{*,ARROWLEFT}" || "({*,b}" && "inrange({*,x},$x4m,$x4M)" && "inrange({*,y},$y4m,$y4M))
-        zoom:=cut($zoom-0.1,0.25,1) wait -1
+        face_area_factor:=cut($face_area_factor-0.1,0.25,1) wait -1
       fi
       if $is_face_detected" && "({*,RETURN}" || "{*,SPACE}" || "{*,b}" || "{*,k}==65366)
         timer_face:=$|-3
@@ -354,7 +354,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
       # Estimate face attributes.
       if !narg($face_attributes)
         if !isdir('snapshots') createdir snapshots fi
-        +r[camera] {camera,s=cut(1.5*$zoom,0,1)*min(w,h);[s,s]},1,100%,0,0,0.5,0.5
+        +r[camera] {camera,s=cut(1.5*$face_area_factor,0,1)*min(w,h);[s,s]},1,100%,0,0,0.5,0.5
         o. snapshots/{`string(v2s(date(0),-4,4),v2s(date(1),-2,2),v2s(date(2),-2,2),\
                               v2s(date(4),-2,2),v2s(date(5),-2,2),v2s(date(6),-2,2))`}.jpg,85
         rs. 128
@@ -365,7 +365,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 
       # Draw camera view.
       j[canvas] [camera_view],$x1m,$y1m,0,0,1,[mask1]
-      x1s,y1s,x1e,y1e={mask1,"M = $zoom*min(w,h);
+      x1s,y1s,x1e,y1e={mask1,"M = $face_area_factor*min(w,h);
         [ x0 = $x1m + (w - M)/2, y0 = $y1m + (h - M)/2, x0 + M - 1, y0 + M - 1 ]"}
       rectangle[canvas] $x1s,$y1s,$x1e,$y1e,0.75,0xF0F0F0F0,255
 
@@ -428,9 +428,9 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
         is_automode:=!$is_automode timer_face=-1 wait -1
       fi
       if {*,ARROWUP}" || "{*,ARROWRIGHT}" || "({*,b}" && "inrange({*,x},$x3m,$x3M)" && "inrange({*,y},$y3m,$y3M))
-        zoom:=cut($zoom+0.1,0.25,1) wait -1
+        face_area_factor:=cut($face_area_factor+0.1,0.25,1) wait -1
       elif {*,ARROWDOWN}" || "{*,ARROWLEFT}" || "({*,b}" && "inrange({*,x},$x4m,$x4M)" && "inrange({*,y},$y4m,$y4M))
-        zoom:=cut($zoom-0.1,0.25,1) wait -1
+        face_area_factor:=cut($face_area_factor-0.1,0.25,1) wait -1
       fi
       if {*,k}==65365" || "{*,BACKSPACE}" || "({*,b}" && "{mask1,i([{*,x,y}]-[$x1m,$y1m])})
         rmn face_attributes wait -1
