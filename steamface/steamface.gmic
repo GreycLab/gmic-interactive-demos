@@ -287,12 +287,12 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
         channels 0,2 rs $siz n 0,255 sf_frame
         a[-3--1] x a[-4--2] x a y
       }
-      ja[canvas] .,{round([$x2m,$y2m]+[0.5*(w#$mask2-w),0.02*(h#$mask2-h)])} rm.
+      ja[canvas] .,{round([$x2m,$y2m]+[0.5*(w#$mask2-w),0.98*(h#$mask2-h)])} rm.
 
       # Draw face detector dial.
       siz={mask2,round(max(1,0.7*w))}
       +sf_dial "Face",$momented_face_detector,$siz
-      x,y:=round([$x2m,$y2m]+[0.5*(w#$mask2-w),0.98*(h#$mask2-h)])
+      x,y:=round([$x2m,$y2m]+[0.5*(w#$mask2-w),0.02*(h#$mask2-h)])
       ja[canvas] .,$x,$y,0,0,0.7 rm.
       if $is_face_detected light_color=green else light_color=red fi
       ja[canvas] [light_$light_color],{$x2m+w#$mask2-w#$light_red-10},$y
@@ -354,7 +354,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
       # Estimate face attributes.
       if !narg($face_attributes)
         if !isdir('snapshots') createdir snapshots fi
-        +r[camera] {camera,s=cut($zoom+0.1,0,1)*min(w,h);[s,s]},1,100%,0,0,0.5,0.5
+        +r[camera] {camera,s=cut(1.5*$zoom,0,1)*min(w,h);[s,s]},1,100%,0,0,0.5,0.5
         o. snapshots/{`string(v2s(date(0),-4,4),v2s(date(1),-2,2),v2s(date(2),-2,2),\
                               v2s(date(4),-2,2),v2s(date(5),-2,2),v2s(date(6),-2,2))`}.jpg,85
         rs. 128
