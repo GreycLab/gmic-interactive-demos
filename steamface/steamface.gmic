@@ -237,6 +237,8 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 
   repeat inf {
 
+    e "DEBUG : "$!
+
     # Step 1 : Face detection.
     #-------------------------
     wait -1
@@ -264,7 +266,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
         rm.
       fi
       momented_face_detector:=lerp($face_detector,$momented_face_detector,0.85)
-      is_face_detected:=$momented_face_detector>=85
+      is_face_detected:=$momented_face_detector>=70
       if $is_face_detected
         if $timer_face<0 timer_face=$| fi
       else timer_face=-1
