@@ -233,7 +233,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 
   # Start user interaction loop.
   w[background] $window_width,$window_height,0,$is_fullscreen,"Steam Face"
-  is_automode=0
+  is_automode=1
 
   repeat inf {
 
