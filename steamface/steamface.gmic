@@ -197,6 +197,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 
 #  window_width,window_height=640,480
 
+  data/background_title.jpg rs. $window_width,$window_height,3,3 => background_title
   data/background.jpg rs. $window_width,$window_height,3,3 => background
   data/dial_bg_band.png => dial_bg
   data/dial_hand.png => dial_hand
@@ -205,6 +206,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
   data/light_green.png => light_green
   data/icon_auto.png => icon_auto
   data/steam_seq.gmz => steam_seq
+  data/logo_steamface.png => logo_steamface
   data/logo_topmodel.png => logo_topmodel
   data/mask.png rs. $window_width,$window_height,1,3
   eval. ">begin(xm = ym = vector4(inf); xM = yM = vector4(-inf));
@@ -213,6 +215,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
   +z. $x2m,$y2m,$x2M,$y2M z.. $x1m,$y1m,$x1M,$y1M neq[-2,-1] 0 => mask1,mask2
   rs[light_red,light_green] {mask1,max(1,round(w/5))}
   rs[icon_auto] ,{background,max(1,round(h/16))}
+  rs[logo_steamface] ,{background,0.4*h}
   +f[background] 255 => background_white
   font_countdown=${"font medievalsharp,512,1"} # Pre-compute font for countdown
 
@@ -231,15 +234,30 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
   nn_load data/face_analysis.gmz
 
   # Initialize webcam.
-  camera $camera_index,1,0,640,480
-  rm.
+#  camera $camera_index,1,0,640,480 rm.
 
   # Start user interaction loop.
-  w[background] $window_width,$window_height,0,$is_fullscreen,"Steam Face"
+  w[background_title] $window_width,$window_height,0,$is_fullscreen,"The SteamFace Machine"
   is_automode=1
   face_area_factor=0.5
 
   repeat inf {
+
+    # Step 0 : Title page.
+    #---------------------
+    if !$>" || "($is_automode" && "!($>%10))
+      timer_title=$|
+      do
+        [background_title] => canvas
+        t:=min(($|-$timer_title)/10,1)
+        ja[canvas] [logo_steamface],0.5~,0.5~
+        w[canvas] wait 20
+        rm[canvas]
+        is_quit:=!{*}" || "{*,ESC}" || "{*,Q}
+        go_next_step:=$t==1
+      while !($is_quit" || "$go_next_step)
+      if $is_quit break fi
+    fi
 
     # Step 1 : Face detection.
     #-------------------------
@@ -451,8 +469,8 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
       fi
 
       is_quit:=!{*}" || "{*,ESC}" || "{*,Q}
-      go_next_step:={*,RETURN}" || "{*,SPACE}" || "{*,b}" || "{*,k}==65366" || "\
-                    ($is_automode" && "$|>$timer_attributes+30)
+      go_next_step:=($is_automode" && "$|>$timer_attributes+30)" || "\
+                    ($|>$timer_attributes+5" && "({*,RETURN}" || "{*,SPACE}" || "{*,b}" || "{*,k}==65366))
 
     while !($is_quit" || "$go_next_step)
     if $is_quit break fi
