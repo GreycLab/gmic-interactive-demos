@@ -234,7 +234,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
   nn_load data/face_analysis.gmz
 
   # Initialize webcam.
-#  camera $camera_index,1,0,640,480 rm.
+  camera $camera_index,1,0,640,480 rm.
 
   # Start user interaction loop.
   w[background_title] $window_width,$window_height,0,$is_fullscreen,"The SteamFace Machine"
@@ -251,16 +251,24 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
       do
         t:=min(($|-$timer_title)/5,1)
 
-        if $t>=0.2
-          [background_title]
-          ja. [logo_steamface],0.5~,0.5~
-        else
+        if $t<0.2
           {background_title,[w,h,1,3]}
           +z[background_title] 0,0,100%,$hb2m1
           +z[background_title] 0,$hb2,100%,100%
-          j... ..,0,{round(lerp(-$hb2,0,5*$t))}
-          j... .,0,{round(lerp(h#$background_title,$hb2,5*$t))}
+          t5:=5*$t
+          to_rgba[-2,-1] rotate[-2,-1] {lerp(10,0,$t5)},0,0
+          ja... ..,0,{round(lerp(-$hb2,0,$t5))}
+          ja... .,0,{round(lerp(h#$background_title,$hb2,$t5))}
           rm[-2,-1]
+        elif $t<0.4
+          [background_title]
+          ja. [logo_steamface],0.5~,0.5~
+          sh[logo_steamface] 100% i.. 100%,100%,1,3,255 a[-2,-1] c
+          opac:=1-($t-0.2)/0.2
+          ja.. .,0.5~,0.5~,0,0,$opac rm.
+        else
+          [background_title]
+          ja. [logo_steamface],0.5~,0.5~
         fi
         => canvas
 
