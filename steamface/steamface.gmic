@@ -246,15 +246,27 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
     # Step 0 : Title page.
     #---------------------
     if !$>" || "($is_automode" && "!($>%10))
+      hb2,hb2m1={background_title,v=int(h/2);[v,v-1]}
       timer_title=$|
       do
-        [background_title] => canvas
-        t:=min(($|-$timer_title)/10,1)
-        ja[canvas] [logo_steamface],0.5~,0.5~
-        w[canvas] wait 20
-        rm[canvas]
+        t:=min(($|-$timer_title)/5,1)
+
+        if $t>=0.2
+          [background_title]
+          ja. [logo_steamface],0.5~,0.5~
+        else
+          {background_title,[w,h,1,3]}
+          +z[background_title] 0,0,100%,$hb2m1
+          +z[background_title] 0,$hb2,100%,100%
+          j... ..,0,{round(lerp(-$hb2,0,5*$t))}
+          j... .,0,{round(lerp(h#$background_title,$hb2,5*$t))}
+          rm[-2,-1]
+        fi
+        => canvas
+
+        w[canvas] wait 20 rm[canvas]
         is_quit:=!{*}" || "{*,ESC}" || "{*,Q}
-        go_next_step:=$t==1
+        go_next_step:=$t==1" || "{*,RETURN}" || "{*,SPACE}" || "{*,b}" || "{*,k}==65366
       while !($is_quit" || "$go_next_step)
       if $is_quit break fi
     fi
