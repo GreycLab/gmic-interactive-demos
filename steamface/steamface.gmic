@@ -362,7 +362,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
         rs. 128
         eval ${-nn_lib}"IN = crop(#-1)/255;"${_celeba_forward}"store('celeba_OUT',100*sigmoid(celeba_OUT))"
         rm. $celeba_OUT => face_attributes
-        if !$>" && "{face_attributes,i[2]>50}
+        if !$>" && "{face_attributes,i[2]>=40}
           timer_top_model=$|
           _steamcloud_x,_steamcloud_y,_steamcloud_w,_steamcloud_t,_steamcloud_dt=0.5,0.5,{canvas,round(0.75*w)},0,0.04
         fi
