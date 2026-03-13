@@ -205,7 +205,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
   data/light_green.png => light_green
   data/icon_auto.png => icon_auto
   data/steam_seq.gmz => steam_seq
-  data/top_model.png => top_model
+  data/logo_topmodel.png => logo_topmodel
   data/mask.png rs. $window_width,$window_height,1,3
   eval. ">begin(xm = ym = vector4(inf); xM = yM = vector4(-inf));
     i?(i1 = i-1; xm[i1] = min(x,xm[i1]); ym[i1] = min(y,ym[i1]); xM[i1] = max(x,xM[i1]); yM[i1] = max(y,yM[i1]));
@@ -346,7 +346,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
     wait -1
     40 => momented_face_attributes
     timer_attributes=$|
-    timer_top_model=inf
+    timer_topmodel=inf
 
     do
       [background] => canvas
@@ -362,8 +362,8 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
         rs. 128
         eval ${-nn_lib}"IN = crop(#-1)/255;"${_celeba_forward}"store('celeba_OUT',100*sigmoid(celeba_OUT))"
         rm. $celeba_OUT => face_attributes
-        if !$>" && "{face_attributes,i[2]>=60}
-          timer_top_model=$|
+        if !$>" && "{face_attributes,i[2]>=50}
+          timer_topmodel=$|
           _steamcloud_x,_steamcloud_y,_steamcloud_w,_steamcloud_t,_steamcloud_dt=0.5,0.5,{canvas,round(0.75*w)},0,0.04
         fi
       fi
@@ -423,11 +423,11 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
       sf_steamcloud
 
       # Draw top-model animation.
-      if $|>=$timer_top_model
-        t:=min(($|-$timer_top_model)/3.5,1) opac:=0.75*sin(pi/2*(wave($t/2,1)^0.75))
-        +rs[top_model] ,{canvas,max(1,h*lerp(0,0.85,$t))} rotate. {30*wave($t)},1,0
+      if $|>=$timer_topmodel
+        t:=min(($|-$timer_topmodel)/3.5,1) opac:=0.75*sin(pi/2*(wave($t/2,1)^0.75))
+        +rs[logo_topmodel] ,{canvas,max(1,h*lerp(0,0.85,$t))} rotate. {30*wave($t)},1,0
         ja[canvas] .,0.5~,0.5~,0,0,$opac rm.
-        if $t==1 timer_top_model=inf fi
+        if $t==1 timer_topmodel=inf fi
       fi
 
       # Draw automode icon.
