@@ -256,7 +256,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
           +z[background_title] 0,0,100%,$hb2m1
           +z[background_title] 0,$hb2,100%,100%
           t5:=5*$t
-          to_rgba[-2,-1] rotate[-2,-1] {lerp(10,0,$t5)},0,0
+          to_rgba[-2,-1] rotate[-2,-1] {lerp(20,0,$t5)},0,0
           ja... ..,0,{round(lerp(-$hb2,0,$t5))}
           ja... .,0,{round(lerp(h#$background_title,$hb2,$t5))}
           rm[-2,-1]
