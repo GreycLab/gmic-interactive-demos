@@ -288,12 +288,12 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
         go_next_step:=$t==1" || "{*,RETURN}" || "{*,SPACE}" || "{*,b}" || "{*,k}==65366
       while !($is_quit" || "$go_next_step)
       if $is_quit break fi
+      _steamcloud_x,_steamcloud_y,_steamcloud_w,_steamcloud_t,_steamcloud_dt=-1
     fi
 
     # Step 1 : Face detection.
     #-------------------------
     wait -1
-    _steamcloud_x,_steamcloud_y,_steamcloud_w,_steamcloud_t,_steamcloud_dt=-1
     momented_face_detector=0
     is_face_detected=0
     timer_face=-1
