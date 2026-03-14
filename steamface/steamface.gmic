@@ -237,7 +237,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
   camera $camera_index,1,0,640,480 rm.
 
   # Start user interaction loop.
-  w[background_title] $window_width,$window_height,0,$is_fullscreen,"The SteamFace Machine"
+  w[] $window_width,$window_height,0,$is_fullscreen,"The SteamFace Machine"
   is_automode=1
   face_area_factor=0.5
 
@@ -248,29 +248,40 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
     if !$>" || "($is_automode" && "!($>%10))
       hb2,hb2m1={background_title,v=int(h/2);[v,v-1]}
       timer_title=$|
+      steamcloud_started,steamcloud_ended=0
       do
-        t:=min(($|-$timer_title)/5,1)
+        t:=min(($|-$timer_title)/8,1)
 
-        if $t<0.2
-          {background_title,[w,h,1,3]}
+        if $t<0.1
+          {background_title,[w,h,1,3]} => canvas
           +z[background_title] 0,0,100%,$hb2m1
           +z[background_title] 0,$hb2,100%,100%
-          t5:=5*$t
-          to_rgba[-2,-1] rotate[-2,-1] {lerp(20,0,$t5)},0,0
-          ja... ..,0,{round(lerp(-$hb2,0,$t5))}
-          ja... .,0,{round(lerp(h#$background_title,$hb2,$t5))}
-          rm[-2,-1]
-        elif $t<0.4
-          [background_title]
-          ja. [logo_steamface],0.5~,0.5~
-          sh[logo_steamface] 100% i.. 100%,100%,1,3,255 a[-2,-1] c
-          opac:=1-($t-0.2)/0.2
-          ja.. .,0.5~,0.5~,0,0,$opac rm.
+          mt:=10*$t
+          to_rgba[-2,-1] rotate[-2,-1] {lerp(20,0,$mt)},0,0
+          ja[canvas] ..,0,{round(lerp(-$hb2,0,$mt))}
+          ja[canvas] .,0,{round(lerp(h#$background_title,$hb2,$mt))}
+          rm[-2,-1] => canvas
+        elif $t<0.9
+          [background_title] => canvas
+          if !$steamcloud_started
+            _steamcloud_x,_steamcloud_y,_steamcloud_w,_steamcloud_t,_steamcloud_dt=0.5,0.5,{background,h},0,0.006
+            steamcloud_started=1
+          fi
+          if !$steamcloud_ended
+            sf_steamcloud
+            if $_steamcloud_t<0 steamcloud_ended=1 fi
+          fi
+          ja[canvas] [logo_steamface],0.5~,0.5~
+          opac:=1-($t-0.1)/0.2
+          if $opac>0
+            sh[logo_steamface] 100%
+            i.. 100%,100%,1,3,255 a[-2,-1] c
+            ja[canvas] .,0.5~,0.5~,0,0,$opac rm.
+          fi
         else
-          [background_title]
-          ja. [logo_steamface],0.5~,0.5~
+          [background_title] => canvas
+          ja[canvas] [logo_steamface],0.5~,0.5~
         fi
-        => canvas
 
         w[canvas] wait 20 rm[canvas]
         is_quit:=!{*}" || "{*,ESC}" || "{*,Q}
@@ -282,6 +293,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
     # Step 1 : Face detection.
     #-------------------------
     wait -1
+    _steamcloud_x,_steamcloud_y,_steamcloud_w,_steamcloud_t,_steamcloud_dt=-1
     momented_face_detector=0
     is_face_detected=0
     timer_face=-1
