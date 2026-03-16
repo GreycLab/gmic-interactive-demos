@@ -2,7 +2,7 @@
 
 **Interactive G'MIC Demonstrations** – A collection of G'MIC-powered interactive scripts and visual applications showcasing various aspects of image processing, typically usable for educational use.
 
-[![thumbnail](img/thumbnail.png)](img/snapshot.jpg)
+[![thumbnail](img/thumbnail.jpg)](img/snapshot.jpg)
 
 ---
 
