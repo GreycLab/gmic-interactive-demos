@@ -161,7 +161,7 @@ sf_frame :
 sf_steamcloud :
   if !narg($_steamcloud_t)" || "0$_steamcloud_t>1
     _steamcloud_x,_steamcloud_y,_steamcloud_w,_steamcloud_t,_steamcloud_dt=-1
-  elif $_steamcloud_t<0" && "g>2.5
+  elif $_steamcloud_t<0" && "g>3
     _steamcloud_x,_steamcloud_y,_steamcloud_w,_steamcloud_t,_steamcloud_dt:=\
       u,u,v(w#$mask1/2,2*w#$mask1),0,u(0.01,0.05)
   fi
