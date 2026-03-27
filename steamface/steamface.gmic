@@ -204,6 +204,9 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 ---- "${g}"Re-Run Analysis on Face Attributes Page:"$n"\n
 ---- > Key '"${c}"BACKSPACE"$n"' or click on the camera view.\n
 ----\n
+---- "${g}"Display CelebA subset:"$n"\n
+---- > Key '"${c}"C"$n"' or click on the white dial.\n
+----\n
 ---- "${g}"Go to Next Page:"$n"\n
 ---- > Keys '"${c}"SPACE"$n"' or '"${c}"ENTER"$n"', or click anywhere.\n
 ----\n
