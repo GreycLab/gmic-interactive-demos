@@ -176,13 +176,24 @@ sf_steamcloud :
     _steamcloud_t+=$_steamcloud_dt
   fi
 
-#@cli st_celeba_page
+#@cli __sf_celeba_page
 #@cli : Display a temporary page showing a subset of celeba-dataset.
 __sf_celeba_page :
   if {*,-C}" || "({*,b}&1" && "inrange({*,x},$x5m,$x5M)" && "inrange({*,y},$y5m,$y5M))
     +rs[celeba_samples] {*,w,h},3,1
     w. wait -1 do wait while {*}" && "!{*,-ESC}" && "!{*,-Q}" && "!{*,-C}" && "!{*,-b}
     rm.
+  fi
+
+#@cli __sf_check_corners
+#@cli : Check if the 3 corners TL/TR/BR have been clicked or not (meaning 'exit demo').
+__sf_check_corners :
+  if {*,b}
+    mask:="
+      x = "{*,x}"; y = "{*,y}";
+      corner = (x<16) + 2*(x>"{*,w}" - 16) + 4*(y<16) + 8*(y>"{*,h}" - 16);
+      corner==5?1:corner==6?2:corner==10?4:0"
+    if $mask corners_clicked|=$mask wait -1 fi
   fi
 
 #@cli steamface : _is_fullscreen={ 0:No | 1:Yes },_camera_index>=0
@@ -211,7 +222,8 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 ---- > Keys '"${c}"SPACE"$n"' or '"${c}"ENTER"$n"', or click anywhere.\n
 ----\n
 ---- "${g}"Exit:"$n"\n
----- > Keys '"${c}"ESC"$n"' or '"${c}"Q"$n"'.\n
+---- > Keys '"${c}"ESC"$n"' or '"${c}"Q"$n"', or click successively on\n
+---- the three image corners NW/NE/SE \n
 ----\n
 ----------------------------------------------------------------\n"
 
@@ -271,6 +283,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 
   # Start user interaction loop.
   is_automode=1
+  corners_clicked=0
   face_area_factor=0.5
 
   repeat inf {
@@ -315,8 +328,11 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
           ja[canvas] [logo_steamface],0.5~,0.5~
         fi
 
-        w[canvas] wait 20 rm[canvas]
-        is_quit:=!{*}" || "{*,ESC}" || "{*,Q}
+        w[canvas] wait 20
+        __sf_check_corners
+        rm[canvas]
+
+        is_quit:=!{*}" || "{*,ESC}" || "{*,Q}" || "$corners_clicked==7
         go_next_step:=$t==1" || "{*,RETURN}" || "{*,SPACE}" || "{*,b}" || "{*,k}==65366
       while !($is_quit" || "$go_next_step)
       if $is_quit break fi
@@ -403,8 +419,9 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
 
       # Display frame and wait for event.
       w[canvas] wait 20
-      rm[canvas,camera,camera_view]
       __sf_celeba_page
+      __sf_check_corners
+      rm[canvas,camera,camera_view]
 
       if {background,{*,-A}" || "({*,b}" && "inrange({*,x},0,w#$icon_auto)" && "inrange({*,y},h-h#$icon_auto,h))}
         is_automode:=!$is_automode timer_face=-1 wait -1
@@ -418,7 +435,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
         timer_face:=$|-3
         timer_countdown=0
       fi
-      is_quit:=!{*}" || "{*,ESC}" || "{*,Q}
+      is_quit:=!{*}" || "{*,ESC}" || "{*,Q}" || "$corners_clicked==7
       go_next_step:=$timer_countdown<0.5
 
     while !($is_quit" || "$go_next_step)
@@ -519,8 +536,9 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
       # Display frame and wait for event.
       if $flash_opacity j[canvas] [background_white],0,0,0,0,$flash_opacity fi
       w[canvas] wait 20
-      rm[canvas,camera,camera_view]
       __sf_celeba_page
+      __sf_check_corners
+      rm[canvas,camera,camera_view]
 
       if {background,{*,-A}" || "({*,b}" && "inrange({*,x},0,w#$icon_auto)" && "inrange({*,y},h-h#$icon_auto,h))}
         is_automode:=!$is_automode timer_face=-1 wait -1
@@ -534,7 +552,7 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
         rmn face_attributes wait -1
       fi
 
-      is_quit:=!{*}" || "{*,ESC}" || "{*,Q}
+      is_quit:=!{*}" || "{*,ESC}" || "{*,Q}" || "$corners_clicked==7
       go_next_step:=($is_automode" && "$|>$timer_attributes+30)" || "\
                     ($|>$timer_attributes+5" && "({*,RETURN}" || "{*,SPACE}" || "{*,b}" || "{*,k}==65366))
 
