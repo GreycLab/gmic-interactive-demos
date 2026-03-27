@@ -193,7 +193,9 @@ __sf_check_corners :
       x = "{*,x}"; y = "{*,y}";
       corner = (x<16) + 2*(x>"{*,w}" - 16) + 4*(y<16) + 8*(y>"{*,h}" - 16);
       corner==5?1:corner==6?2:corner==10?4:0"
-    if $mask corners_clicked|=$mask wait -1 fi
+    if $mask corners_clicked|=$mask wait -1
+    else corners_clicked=0
+    fi
   fi
 
 #@cli steamface : _is_fullscreen={ 0:No | 1:Yes },_camera_index>=0
