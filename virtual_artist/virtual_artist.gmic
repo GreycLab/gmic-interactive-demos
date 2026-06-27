@@ -434,7 +434,7 @@ va_stylize :
         "$6<=1 && isint(${7=0}) && $7>=0 && $7<=3 && isint(${8=16}) && $8>=0 && ${9=0}>=0 && isint(${10=5}) && "\
         "$10>0 && isint(${11=5}) && $11>0 && isint(${12=$11}) && $12>0 && isint(${13=2}) && isint(${14=30}) && "\
         "${15=10}>=0 && ${16=2}>=0 && ${17=1.85}>1 && isint(${18=0})>=0"
-  skip "${19=s c,-3 match_histogram[0] [2] b[0,2] xy,0.7 n[0,2] 0,255 n[1,2] 0,200 a[0,1] c a[1,2] c}"
+  skip "${19=s c,-3 transfer_histogram[0] [2] b[0,2] xy,0.7 n[0,2] 0,255 n[1,2] 0,200 a[0,1] c a[1,2] c}"
   e[^-1] "Stylize image$? with style image $1."
   v -
   fidelity_finest,\ # $2
@@ -571,8 +571,8 @@ va_fx_stylize : l[] if !narg($$stylize) _fx_stylize_ fi onfail done
     match_colors=$match_colors" ac[0,1] \"balance_gamma ,\","$colorspace$luma
     if narg($chroma) match_colors=$match_colors" ac[0,1] \"balance_gamma ,\","$colorspace$chroma fi
   elif $10==2
-    match_colors=$match_colors" match_histogram[0] [1],256,"$colorspace$luma
-    if narg($chroma) match_colors=$match_colors" match_histogram[0] [1],256,"$colorspace$chroma fi
+    match_colors=$match_colors" transfer_histogram[0] [1],256,"$colorspace$luma
+    if narg($chroma) match_colors=$match_colors" transfer_histogram[0] [1],256,"$colorspace$chroma fi
   elif $10==3
     match_colors=$match_colors" match_pca[0] [1],"$colorspace$luma" c[0] 0,255"
     if narg($chroma) match_colors=$match_colors" match_pca[0] [1],"$colorspace$chroma" c[0] 0,255" fi
@@ -590,7 +590,7 @@ va_fx_stylize : l[] if !narg($$stylize) _fx_stylize_ fi onfail done
   # colorspace=${"arg0 $11,all,lrgb,ycbcr,ycbcr_y,ycbcr_cbcr,lab,lab_l,lab_ab"}
   # match_colors="s c,-3 mv[1] 3 b[-2,-1] 1% negate[-2,-1] n[-2,-1] 0,1"
   # if $10==1 match_colors=$match_colors" ac[0,1] \"balance_gamma ,\","$colorspace
-  # elif $10==2 match_colors=$match_colors" match_histogram[0] [1],256,"$colorspace
+  # elif $10==2 match_colors=$match_colors" transfer_histogram[0] [1],256,"$colorspace
   # fi
   # if $12==1 match_colors=$match_colors" rgb2ycbcr[0,1] sh[0,1] 1,2 f[-2,-1] 128 rm[-2,-1] ycbcr2rgb[0,1]"
   # elif $12==2 match_colors=$match_colors" srgb2lab[0,1] sh[0,1] 1,2 f[-2,-1] 0 rm[-2,-1] lab2srgb[0,1]"
