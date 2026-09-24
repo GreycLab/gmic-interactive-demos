@@ -574,8 +574,8 @@ va_fx_stylize : l[] if !narg($$stylize) _fx_stylize_ fi onfail done
     match_colors=$match_colors" transfer_histogram[0] [1],256,"$colorspace$luma
     if narg($chroma) match_colors=$match_colors" transfer_histogram[0] [1],256,"$colorspace$chroma fi
   elif $10==3
-    match_colors=$match_colors" match_pca[0] [1],"$colorspace$luma" c[0] 0,255"
-    if narg($chroma) match_colors=$match_colors" match_pca[0] [1],"$colorspace$chroma" c[0] 0,255" fi
+    match_colors=$match_colors" transfer_pca[0] [1],"$colorspace$luma" c[0] 0,255"
+    if narg($chroma) match_colors=$match_colors" transfer_pca[0] [1],"$colorspace$chroma" c[0] 0,255" fi
   fi
   if $12==1 match_colors=$match_colors" rgb2ycbcr[0,1] sh[0,1] 1,2 f[-2,-1] 128 rm[-2,-1] ycbcr2rgb[0,1]"
   elif $12==2 match_colors=$match_colors" srgb2lab[0,1] sh[0,1] 1,2 f[-2,-1] 0 rm[-2,-1] lab2srgb[0,1]"
