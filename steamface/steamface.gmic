@@ -353,18 +353,18 @@ steamface : check "isbool(${1=1}) && isint(${2=0},0)"
       +sf_camera $camera_index
 
       # Get face detector output.
-      if !($>%8)
+      if !($>%4)
         +r[camera] {camera,s=0.85*$face_area_factor*min(w,h);[s,s]},1,100%,0,0,0.5,0.5
         rs. 54 norm.
         face_detector:=${-nn_lib}"
           IN = crop(#-1);"\
           ${_faceds_forward}"
-          nn_store('face0',faceds_C1);
-          nn_store('face1',faceds_NL1);
-          nn_store('face2',faceds_C2);
-          nn_store('face3',faceds_C3);
-          nn_store('face4',faceds_NL3);
-          nn_store('face5',faceds_NL6);
+          nn_store('face0',faceds_C1b);
+          nn_store('face1',faceds_NL1b);
+          nn_store('face2',faceds_C2b);
+          nn_store('face3',faceds_NL2b);
+          nn_store('face4',faceds_C3b);
+          nn_store('face5',faceds_NL3b);
           100*sigmoid(faceds_OUT[0])"
         rm.
       fi
